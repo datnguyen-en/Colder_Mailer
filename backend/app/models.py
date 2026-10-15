@@ -17,7 +17,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 CONTACT_STATUSES = ("new", "queued", "sending", "sent", "replied", "bounced", "failed")
 CONTACT_SOURCES = ("paste", "csv", "hunter", "manual")
-SEND_EVENTS = ("queued", "sent", "failed", "replied", "bounced", "requeued")
+SEND_EVENTS = ("queued", "sent", "failed", "replied", "bounced", "requeued", "unqueued")
 
 
 def _in(column: str, values: tuple[str, ...]) -> str:
@@ -124,7 +124,12 @@ class SendEvent(Base):
     """Append-only history of contact status changes."""
 
     __tablename__ = "send_events"
-    __table_args__ = (CheckConstraint(_in("event", SEND_EVENTS), name="event_valid"),)
+    __table_args__ = (
+        CheckConstraint(_in("event", SEND_EVENTS), name="event_valid"),
+        # One email per address, enforced by the database too.
+        Index("uq_send_events_one_sent", "contact_id", unique=True,
+              postgresql_where=text("event = 'sent'")),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     contact_id: Mapped[int] = mapped_column(

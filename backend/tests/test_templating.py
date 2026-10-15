@@ -27,14 +27,14 @@ def test_tokens_are_case_insensitive():
     assert body == "Hi Jane, Jane Doe"
 
 
-def test_missing_name_raises():
-    with pytest.raises(TemplateError, match=r"\[Name\] has no value"):
-        render(tpl("Hello"), NS(first_name=None, last_name=None, title=None), STRIPE)
+def test_missing_name_falls_back_to_there():
+    no_name = NS(first_name=None, last_name=None, title=None)
+    assert render(tpl("Hello", "Hi [Name], / [FullName]"), no_name, STRIPE) == ("Hello", "Hi there, / there")
 
 
 def test_blank_name_counts_as_missing():
-    with pytest.raises(TemplateError):
-        render(tpl("Hello"), NS(first_name="   ", last_name="Doe", title=None), STRIPE)
+    _, body = render(tpl("Hello"), NS(first_name="   ", last_name="Doe", title=None), STRIPE)
+    assert body == "Hi there,"
 
 
 def test_missing_company_raises():
@@ -76,21 +76,21 @@ def test_empty_subject_raises():
 
 def test_all_problems_reported_together():
     with pytest.raises(TemplateError) as exc:
-        render(tpl("[Company] [Foo]", "Hi [Name] [Foo]"), NS(first_name=None), None)
+        render(tpl("[Company] [Foo]", "Hi [Title] [Foo]"), NS(first_name=None), None)
     assert exc.value.problems == [
         "[Company] has no value for this contact",
         "Unknown token [Foo]",
-        "[Name] has no value for this contact",
+        "[Title] has no value for this contact",
     ]
 
 
 def test_partial_render_leaves_unfilled_tokens_visible():
     subject, body, problems = render_partial(
-        tpl("Role at [Company]", "Hi [Name]"), NS(first_name=None), STRIPE
+        tpl("Role at [Company]", "Hi [Name]"), NS(first_name="Jane"), None
     )
-    assert subject == "Role at Stripe"
-    assert body == "Hi [Name]"
-    assert problems == ["[Name] has no value for this contact"]
+    assert subject == "Role at [Company]"
+    assert body == "Hi Jane"
+    assert problems == ["[Company] has no value for this contact"]
 
 
 def test_brackets_inside_values_are_not_rescanned():

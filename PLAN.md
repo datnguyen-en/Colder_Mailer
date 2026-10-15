@@ -115,6 +115,7 @@ Takes the edited preview rows. Creates missing companies; if I edited a company 
 - Tokens: `[Company]`, `[Name]` (first name), `[FullName]`, `[Title]`. Matching is case-insensitive.
 - `render(template, contact, company) -> (subject, body)`.
 - **Validation:** raise if a used token has no value, or if any `[...]` token remains that isn't recognized. **Never send an email containing an unfilled token.**
+- **Missing name is not a blocker** (decided 2026-10-15): `[Name]` / `[FullName]` fall back to "there" ("Hi there,"). The email address is what matters.
 - Resume filename: `resume_filename_pattern` with `{company}` = company name stripped to alphanumerics (`Jane Street` → `Eric_Resume_JaneStreet.pdf`).
 
 ### Sending
@@ -206,6 +207,7 @@ Supabase project (DB, Auth, Storage), SAM template (API Lambda via Mangum + work
 ## Rules for the whole project
 
 - Safe by default: bulk sending only through the throttled queue; every send is logged; nothing is ever resent automatically.
+- **One email per address, ever** (decided 2026-10-15): once an address has been sent, replied, or bounced, it can never be queued or sent again (checked in `services.transition`, backed by a unique index allowing one `sent` event per contact). Emailed contacts can't be deleted, so a re-import can't bring them back as new. Requeueing a stuck send requires confirming it isn't in Gmail's Sent folder.
 - No secrets, tokens, or resume files in git (`.gitignore` covers `.env`, `credentials*.json`, `token*.json`, uploads).
 - Keep `parser.py` and `templating.py` pure and fully unit-tested; they're the core of the app.
 - Small, readable code. No extra frameworks beyond the stack above without asking.

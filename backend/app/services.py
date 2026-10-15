@@ -3,7 +3,7 @@
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
 from app import parser, schemas, templating
@@ -150,11 +150,34 @@ def _clean(value: str | None) -> str | None:
 # --- status ------------------------------------------------------------------
 
 
+CONTACTED_EVENTS = ("sent", "replied", "bounced")
+
+
+class AlreadyContacted(Exception):
+    """Raised instead of ever queueing or sending a second email to someone."""
+
+    def __init__(self, contact: Contact):
+        super().__init__(f"{contact.email} has already been emailed. Each address gets one email, ever.")
+
+
+def was_contacted(db: Session, contact: Contact) -> bool:
+    """True once this address has been emailed (by the app, or marked sent/replied/bounced
+    by hand). History lives in send_events, which survives status edits."""
+    if contact.sent_at or contact.gmail_message_id:
+        return True
+    return bool(db.scalar(select(exists().where(
+        SendEvent.contact_id == contact.id, SendEvent.event.in_(CONTACTED_EVENTS)
+    ))))
+
+
 def transition(
     db: Session, contact: Contact, status: str, event: str, detail: str | None = None
 ) -> None:
     """Change a contact's status and append the matching send_events row.
-    The caller commits."""
+    The caller commits. Every queue/send path goes through here, so this is
+    where a second email to the same person is refused."""
+    if status in ("queued", "sent") and was_contacted(db, contact):
+        raise AlreadyContacted(contact)
     now = datetime.now(UTC)
     contact.status = status
     contact.updated_at = now

@@ -1,6 +1,8 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 
 from app.models import Company, Contact, DomainAlias, SendEvent
 
@@ -67,12 +69,19 @@ def test_preview_without_template_is_409(client):
     assert client.get(f"/contacts/{jane['id']}/preview").status_code == 409
 
 
-def test_preview_lists_template_problems(client):
+def test_preview_without_name_uses_there(client):
     client.post("/templates", json=TEMPLATE)
     c = add_contact(client, "zxqv@ramp.com")  # no name
     preview = client.get(f"/contacts/{c['id']}/preview").json()
-    assert "[Name] has no value for this contact" in preview["problems"]
-    assert "Hi [Name]," in preview["body"]
+    assert preview["body"].startswith("Hi there,")
+    assert preview["problems"] == ["No resume uploaded"]
+
+
+def test_preview_lists_template_problems(client):
+    client.post("/templates", json=TEMPLATE)
+    c = add_contact(client, "emma.watson@gmail.com")  # personal: no company
+    preview = client.get(f"/contacts/{c['id']}/preview").json()
+    assert "[Company] has no value for this contact" in preview["problems"]
 
 
 def test_csv_parse_and_import_keeps_title(client):
@@ -210,15 +219,57 @@ def test_stuck_sending_can_be_requeued_but_fresh_one_cannot(client, db):
     db.execute(update(Contact).values(updated_at=datetime.now(UTC) - timedelta(minutes=31)))
     db.commit()
     assert contacts(client)["items"][0]["stuck"] is True
-    assert client.post(f"/contacts/{c['id']}/requeue").json()["status"] == "queued"
+    # It may have gone out: requeue needs explicit confirmation after checking Gmail.
+    assert client.post(f"/contacts/{c['id']}/requeue").status_code == 409
+    res = client.post(f"/contacts/{c['id']}/requeue", params={"confirm_not_sent": True})
+    assert res.json()["status"] == "queued"
 
 
 def test_delete_contact(client, db):
     c = add_contact(client, "jane.doe@stripe.com")
-    client.patch(f"/contacts/{c['id']}", json={"status": "sent"})
+    client.patch(f"/contacts/{c['id']}", json={"status": "queued"})
     assert client.delete(f"/contacts/{c['id']}").status_code == 204
     assert client.delete(f"/contacts/{c['id']}").status_code == 404
     assert db.scalar(select(SendEvent)) is None
+
+
+# --- one email per address, ever ---------------------------------------------
+
+
+def test_emailed_contact_cannot_be_deleted_so_reimport_is_skipped(client):
+    c = add_contact(client, "jane.doe@stripe.com")
+    client.patch(f"/contacts/{c['id']}", json={"status": "sent"})
+    res = client.delete(f"/contacts/{c['id']}")
+    assert res.status_code == 409 and "second email" in res.json()["detail"]
+    assert import_rows(client, parse(client, "Jane.Doe@stripe.com"))["created"] == 0
+
+
+@pytest.mark.parametrize("contacted", ["sent", "replied", "bounced"])
+def test_contacted_address_can_never_be_queued_again(client, contacted):
+    c = add_contact(client, "jane.doe@stripe.com")
+    url = f"/contacts/{c['id']}"
+    client.patch(url, json={"status": contacted})
+    # Every route back into the queue is refused, even via a manual "failed".
+    client.patch(url, json={"status": "failed"})
+    for attempt in (
+        lambda: client.patch(url, json={"status": "queued"}),
+        lambda: client.post(f"{url}/requeue"),
+        lambda: client.patch(url, json={"status": "sent"}),
+    ):
+        res = attempt()
+        assert res.status_code == 409, res.text
+        assert "one email, ever" in res.json()["detail"]
+    assert contacts(client)["items"][0]["status"] == "failed"
+
+
+def test_database_allows_only_one_sent_event_per_contact(client, db):
+    c = add_contact(client, "jane.doe@stripe.com")
+    db.add(SendEvent(contact_id=c["id"], event="sent"))
+    db.commit()
+    db.add(SendEvent(contact_id=c["id"], event="sent"))
+    with pytest.raises(IntegrityError):
+        db.commit()
+    db.rollback()
 
 
 # --- companies --------------------------------------------------------------
@@ -317,3 +368,12 @@ def test_stats(client, db):
     assert len(stats["sends_per_day"]) == 30 and stats["sends_per_day"][-1]["sent"] == 3
     assert stats["recent_activity"][0]["event"] == "replied"
     assert set(stats["warnings"]) == {"gmail_disconnected", "no_resume", "no_default_template"}
+
+
+def test_unqueue(client, db):
+    c = add_contact(client, "jane.doe@stripe.com")
+    assert client.post(f"/contacts/{c['id']}/unqueue").status_code == 409  # not queued
+    client.patch(f"/contacts/{c['id']}", json={"status": "queued"})
+    res = client.post(f"/contacts/{c['id']}/unqueue").json()
+    assert (res["status"], res["queued_at"]) == ("new", None)
+    assert db.scalars(select(SendEvent.event).order_by(SendEvent.id)).all() == ["queued", "unqueued"]

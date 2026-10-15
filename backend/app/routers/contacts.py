@@ -95,6 +95,9 @@ def update_contact(contact_id: int, req: schemas.ContactUpdate, db: Session = De
 def delete_contact(contact_id: int, db: Session = Depends(get_db)):
     contact = get_contact(db, contact_id)
     _ensure_not_in_flight(contact)
+    if services.was_contacted(db, contact):
+        # Keeping the row is what stops a re-import from emailing them again.
+        raise HTTPException(409, f"{contact.email} has been emailed, so it's kept to prevent a second email")
     db.delete(contact)
     db.commit()
     return Response(status_code=204)
@@ -111,15 +114,31 @@ def mark_replied(contact_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{contact_id}/requeue", response_model=schemas.ContactOut)
-def requeue(contact_id: int, db: Session = Depends(get_db)):
-    """Manual retry for a failed or stuck send. Never automatic: the first
-    attempt may have gone out."""
+def requeue(contact_id: int, confirm_not_sent: bool = False, db: Session = Depends(get_db)):
+    """Manual retry for a failed or stuck send. Never automatic.
+
+    A stuck send may have reached Gmail, so it needs `confirm_not_sent=true`:
+    you checked Gmail's Sent folder and it isn't there."""
     contact = get_contact(db, contact_id)
     if contact.status not in ("failed", "sending"):
         raise HTTPException(409, f"Only failed or stuck contacts can be requeued (this one is {contact.status})")
     _ensure_not_in_flight(contact)
+    if contact.status == "sending" and not confirm_not_sent:
+        raise HTTPException(409, "This send may have gone out. Check Gmail's Sent folder, then confirm.")
     previous = contact.status
     services.transition(db, contact, "queued", "requeued", f"requeued from {previous}")
+    db.commit()
+    return contact_out(contact)
+
+
+@router.post("/{contact_id}/unqueue", response_model=schemas.ContactOut)
+def unqueue(contact_id: int, db: Session = Depends(get_db)):
+    """Take a queued contact back out of the queue before it is sent."""
+    contact = get_contact(db, contact_id)
+    if contact.status != "queued":
+        raise HTTPException(409, f"Only queued contacts can be unqueued (this one is {contact.status})")
+    services.transition(db, contact, "new", "unqueued")
+    contact.queued_at = None
     db.commit()
     return contact_out(contact)
 

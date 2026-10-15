@@ -2,6 +2,8 @@
 
 An email must never go out with an unfilled token, so `render` raises on any
 token it can't fill and on any [...] or {...} placeholder it doesn't know.
+A missing name isn't a blocker: [Name] and [FullName] fall back to "there"
+("Hi there,"), since the email address is what matters.
 """
 
 import re
@@ -12,6 +14,7 @@ TOKEN_RE = re.compile(r"\[([^\[\]\r\n]*)\]")
 # Placeholders from other tools ({first_name}, {{company}}) would go out literally.
 CURLY_RE = re.compile(r"\{\{?\s*[A-Za-z_]+\s*\}?\}")
 KNOWN_TOKENS = ("company", "name", "fullname", "title")
+NAME_FALLBACK = "there"
 
 
 class TemplateLike(Protocol):
@@ -34,8 +37,8 @@ def token_values(contact: Any, company: Any) -> dict[str, str]:
     first, last = _text(contact, "first_name"), _text(contact, "last_name")
     return {
         "company": _text(company, "name"),
-        "name": first,
-        "fullname": f"{first} {last}".strip() if first else "",
+        "name": first or NAME_FALLBACK,
+        "fullname": f"{first} {last}".strip() if first else NAME_FALLBACK,
         "title": _text(contact, "title"),
     }
 
