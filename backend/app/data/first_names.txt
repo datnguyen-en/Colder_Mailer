@@ -1,0 +1,61 @@
+# Common first names (lowercase, one per line) used to recognize single-token
+# email local parts like "sarah@". Add names freely; lines starting with # are ignored.
+aaron abby abdul abdullah abel abhinav abhishek abigail abraham ada adam adarsh aditi aditya adrian adriana
+agnes ahmad ahmed aidan aiden aisha ajay akash akhil akira alan albert alberto alec alejandra alejandro
+alex alexa alexander alexandra alexandre alexis alfred ali alice alicia alina alisha alison allen allison
+alvin alyssa amanda amar amber amelia amir amit amy ana anand ananya andre andrea andreas andres
+andrew andy angel angela angelica angelo anh anil anita anjali ankit ankur ann anna anne annie anthony
+antoine antonio anuj anup anya april archana archer ari ariana arianna ariel arjun arnav arnold aron
+arthur arun arvind asha ashish ashley ashok ashwin aubrey audrey austin ava avery avi avinash ayesha
+barbara barry beatrice becky bella ben benjamin bernard beth bethany betty beverly bhavya bianca bill billy
+blake bo bob bobby bonnie brad bradley brandon brenda brendan brett brian briana brianna bridget brittany
+brooke bruce bruno bryan bryce caleb calvin cameron camila camille candace cara carl carla carlos carmen
+carol caroline carolyn carson carter casey cassandra catherine cathy cecilia cedric celeste celine chad
+chandler charles charlie charlotte chase chau chelsea cheng cheryl chetan chi chloe chris christian
+christina christine christopher chuck cindy claire clara clark claudia clayton cody colby cole colin
+colleen connor conor constance cooper corey cory courtney craig cristina crystal curtis cynthia daisy dakota
+dale dallas damian damon dan dana daniel daniela danielle danny dante daphne darius darren darryl dat
+dave david dawn dean deanna debbie deborah deepak deepika deja denise dennis derek derrick devin devon
+dexter dhruv diana diane diego dina dinesh dmitri dominic dominique don donald donna dora doris dorothy
+douglas drew duc duncan dung dustin dylan ed eddie edgar edith eduardo edward edwin eileen elaine elena
+eli elias elijah elisa elise eliza elizabeth ella ellen ellie elliot elliott ellis eloise elsa emanuel
+emily emma emmanuel eric erica erik erika erin ernest esther ethan eugene eva evan evelyn faisal farah
+fatima felicia felix fernando fiona frances francesca francis francisco frank frankie fred freddie
+frederick gabe gabriel gabriela gabrielle gail gary gaurav gautam gavin gemma gene geoffrey george georgia
+gerald gerardo gina giovanni gisele giulia glen glenn gloria gordon grace graham grant greg gregory
+gretchen guillermo gustavo gwen hailey haley hamza hana hannah hao hari harish harold harper
+harrison harry harvey hassan hayden heather hector heidi helen helena henry hien hieu hillary himanshu
+hiroshi hoa holly hong howard hugh hugo hung hunter huong hussein huy ian ibrahim igor ingrid irene iris
+isaac isabel isabella isabelle isaiah ishaan ivan ivy jack jackie jackson jacob jacqueline jade jaden jai
+jaime jake james jamie jan jane janet janice jared jasmine jason javier jay jayden jean jeff jeffrey
+jen jenna jennifer jenny jeremiah jeremy jerome jerry jesse jessica jessie jesus jia jian jill jim
+jimmy jin jing joan joanna joanne joel joey johan johanna john johnny jon jonah jonathan jordan jorge jose
+joseph josephine josh joshua josie joy joyce juan judith judy julia julian juliana julie julien juliet
+julio jun june justin kai kaitlyn kamal karan karen karina karl karthik kate katelyn katherine kathleen
+kathryn kathy katie katrina kavya kayla keith kelly kelsey ken kendall kendra kenji kenneth kenny kent
+kerry kevin khalid khanh kimberly kirk kiran kris krishna kristen kristin kristina kurt kyle
+lakshmi lan lana lance landon lara larry laura lauren laurie lawrence leah leila lena leo leon leonard
+leonardo leslie lester lewis lexi liam lily linda lindsay lindsey ling linh lisa liz liza logan
+lois lorenzo lori louis louise lucas lucia lucy luis luke luna lydia lynn mackenzie madeline madelyn
+madison maggie mahesh mai malcolm mandy manish manoj manuel mara marc marcel marcia marco marcus margaret
+maria mariah marie marina mario marisa marissa mark marshall martha martin marvin mary mason mateo matt
+matthew maura maureen max maxwell maya megan meghan mei melanie melinda melissa melody meredith mia
+micah michael michele michelle miguel mike mila miles milo min minh mira miranda miriam mitchell mohamed
+mohammad mohammed molly monica morgan muhammad mustafa nadia nam nancy naomi natalia natalie natasha
+nathan nathaniel naveen neal neha neil nelson nghia ngoc nhung nicholas nick nicolas nicole nikhil
+nikita nina ning nisha nitin noah noel nolan nora olga olivia omar oscar owen pablo paige pamela paolo
+parker patricia patrick paul paula pauline pedro peggy peng peter phil philip phillip phoebe phong phuong
+pierre ping piyush pooja prakash pranav prateek pratik preeti preston priya priyanka quang quinn rachel
+rafael rahul raj rajesh rakesh ralph ramesh ramon randall randy raphael raquel ravi ray raymond rebecca
+reed reggie rehan renee reza ricardo richard rick ricky riley rishi rita rob robert roberta roberto robin
+rocky rodney rodrigo rohan rohit roland roman ron ronald rosa rose ross roy ruby rudy russell ruth ryan
+sabrina sachin sadie sahil sai sakura sally sam samantha sameer samir samuel sandeep sandra sanjay santiago
+sara sarah sasha saurabh scott sean sebastian serena sergei sergio seth shane shannon sharon shawn sheila
+shelby sheldon shirley shivam shreya shubham shruti siddharth sidney simon simone sofia sonia sophia sophie
+spencer stacy stanley stefan stella stephanie stephen steve steven stuart sudhir sumit sunil sunny suresh
+susan suzanne swati sydney sylvia takashi tam tamara tammy tanya tara tarun taylor ted teresa terrence
+terry thanh thao theo theodore theresa thomas tiffany tim timothy tina toby todd tom tommy tony tracy
+travis trent trevor tristan troy trung tuan tyler uma umar valerie vanessa varun vera veronica
+victor victoria vijay vikram vincent vinh vinod viola violet vishal vivek vivian walter warren wayne
+wei wendy wesley will william willie xavier xi xiao xin yan yang yash yasmin yi ying yolanda
+yong yu yuki yuri yusuf yvonne zach zachary zain zara zoe zoey

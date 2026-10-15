@@ -1,0 +1,33 @@
+# Secrets
+.env
+.env.*
+!.env.example
+credentials*.json
+token*.json
+client_secret*.json
+
+# Uploads / resumes
+uploads/
+backend/uploads/
+*.pdf
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+
+# Hunter cache (Phase 5)
+cache/
+
+.DS_Store
