@@ -164,7 +164,7 @@ function Contacts() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <PageHeader title="Contacts" description={data ? `${data.total} total` : undefined}>
+      <PageHeader eyebrow="People" title="Contacts" description={data ? `${data.total} total` : undefined}>
         <Button render={<Link href="/import" />} nativeButton={false} variant="outline">Import</Button>
       </PageHeader>
 
@@ -206,7 +206,7 @@ function Contacts() {
 
       {error && <ErrorAlert message={error} />}
 
-      <div className="rounded-lg border">
+      <div className="overflow-hidden rounded-3xl border bg-card shadow-soft">
         <Table>
           <TableHeader>
             <TableRow>

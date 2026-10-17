@@ -1,6 +1,6 @@
 "use client"
 
-import { MailIcon } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
 
@@ -34,9 +34,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MailIcon className="size-5" /> Cold Email Tracker
-          </CardTitle>
+          <Image src="/logo.png" alt="" width={48} height={48} className="mb-3 size-12 rounded-full" priority />
+          <CardTitle className="text-2xl">Colder Mailer</CardTitle>
           <CardDescription>Sign in with a magic link.</CardDescription>
         </CardHeader>
         <CardContent>

@@ -1,11 +1,14 @@
 "use client"
 
-import { Loader2Icon, PlusIcon, StarIcon } from "lucide-react"
+import { Loader2Icon, PenLineIcon, PlusIcon, StarIcon } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
+import { ConfirmDialog } from "@/components/confirm-dialog"
 import { EmailPreviewView } from "@/components/email-preview"
 import { ErrorAlert, PageHeader } from "@/components/page-header"
+import { RichTextEditor, type RichTextHandle } from "@/components/rich-text-editor"
+import { SignatureDialog } from "@/components/signature-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,18 +18,20 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import {
   post,
   put,
   type ContactPage,
   type EmailPreview,
+  type Settings,
   type Template,
 } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
+import { cn } from "@/lib/utils"
 
 const TOKENS = [
   { token: "[Name]", hint: "First name" },
@@ -38,24 +43,34 @@ const TOKENS = [
 const STARTER = {
   name: "Main",
   subject: "Software engineering internship at [Company]",
-  body: "Hi [Name],\n\nI'm a computer science student and I'd love to be considered for a software engineering internship at [Company]. ...\n\nMy resume is attached. Thanks for your time!\n\nBest,\nEric",
+  body: "<p>Hi [Name],</p><p>I'm a computer science student and I'd love to be considered for a software engineering internship at [Company].</p><p>My resume is attached. Thanks for your time!</p><p>Best,<br>Eric</p>",
   is_default: false,
 }
 
 type Draft = typeof STARTER
 type Field = "subject" | "body"
 
+// Cold emails that get replies are short; nudge, don't block.
+const WORD_TARGET = 125
+const countWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length
+
 export default function TemplatesPage() {
   const templates = useApi<Template[]>("/templates")
   const contacts = useApi<ContactPage>("/contacts?page_size=200")
+  const settings = useApi<Settings>("/settings")
+  const [signatureOpen, setSignatureOpen] = useState(false)
+  const [words, setWords] = useState(0)
   const [editingId, setEditingId] = useState<number | "new" | null>(null)
   const [draft, setDraft] = useState<Draft>(STARTER)
+  // What the draft looked like when opened or last saved, to spot unsaved edits.
+  const [cleanDraft, setCleanDraft] = useState<Draft>(STARTER)
+  const [pendingSwitch, setPendingSwitch] = useState<number | "new" | null>(null)
   const [saving, setSaving] = useState(false)
   const [contactId, setContactId] = useState<string | null>(null)
   const [preview, setPreview] = useState<EmailPreview | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const subjectRef = useRef<HTMLInputElement>(null)
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const bodyRef = useRef<RichTextHandle>(null)
   const lastField = useRef<Field>("body")
 
   // Once templates load, open the default one (or a starter draft for the first template).
@@ -67,6 +82,7 @@ export default function TemplatesPage() {
 
   const firstContact = contacts.data?.items[0]
   const previewContactId = contactId ?? (firstContact ? String(firstContact.id) : null)
+  const signature = settings.data?.signature ?? ""
 
   // Live preview, debounced while typing.
   useEffect(() => {
@@ -84,20 +100,51 @@ export default function TemplatesPage() {
         .catch((e: Error) => setPreviewError(e.message))
     }, 300)
     return () => clearTimeout(t)
-  }, [draft.subject, draft.body, previewContactId])
+  }, [draft.subject, draft.body, previewContactId, signature])
 
   function open(t: Template) {
+    const next = { name: t.name, subject: t.subject, body: t.body, is_default: t.is_default }
     setEditingId(t.id)
-    setDraft({ name: t.name, subject: t.subject, body: t.body, is_default: t.is_default })
+    setDraft(next)
+    setCleanDraft(next)
+  }
+
+  function startNew() {
+    const next = { ...STARTER, name: "" }
+    setEditingId("new")
+    setDraft(next)
+    setCleanDraft(next)
+  }
+
+  const dirty = JSON.stringify(draft) !== JSON.stringify(cleanDraft)
+
+  function switchTo(target: number | "new") {
+    if (target === "new") startNew()
+    else {
+      const t = templates.data?.find((x) => x.id === target)
+      if (t) open(t)
+    }
+  }
+
+  /** From the template box: switch, but ask first if that would drop unsaved edits. */
+  function choose(value: string | null) {
+    if (value === null) return
+    const target = value === "new" ? "new" : Number(value)
+    if (target === editingId) return
+    if (dirty) setPendingSwitch(target)
+    else switchTo(target)
   }
 
   function insertToken(token: string) {
-    const field = lastField.current
-    const el = field === "subject" ? subjectRef.current : bodyRef.current
-    const value = draft[field]
+    if (lastField.current === "body") {
+      bodyRef.current?.insertText(token)
+      return
+    }
+    const el = subjectRef.current
+    const value = draft.subject
     const start = el?.selectionStart ?? value.length
     const end = el?.selectionEnd ?? value.length
-    setDraft({ ...draft, [field]: value.slice(0, start) + token + value.slice(end) })
+    setDraft({ ...draft, subject: value.slice(0, start) + token + value.slice(end) })
     requestAnimationFrame(() => {
       el?.focus()
       el?.setSelectionRange(start + token.length, start + token.length)
@@ -113,7 +160,9 @@ export default function TemplatesPage() {
         : await put<Template>(`/templates/${editingId}`, body)
       templates.reload()
       setEditingId(saved.id)
-      setDraft({ ...draft, is_default: saved.is_default })
+      const next = { ...draft, is_default: saved.is_default }
+      setDraft(next)
+      setCleanDraft(next)
       toast.success(saved.is_default ? "Saved as the default template" : "Saved")
     } catch (e) {
       toast.error((e as Error).message)
@@ -121,6 +170,11 @@ export default function TemplatesPage() {
       setSaving(false)
     }
   }
+
+  const templateItems = [
+    ...(templates.data ?? []).map((t) => ({ value: String(t.id), label: t.name, isDefault: t.is_default })),
+    { value: "new", label: "New template", isDefault: false },
+  ]
 
   const contactItems = (contacts.data?.items ?? []).map((c) => ({
     value: String(c.id),
@@ -130,34 +184,37 @@ export default function TemplatesPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
+        eyebrow="Your email"
         title="Email template"
-        description="The default template is what every email uses. Tokens are filled in per contact."
-      >
-        {(templates.data?.length ?? 0) > 0 && (
-          <Button variant="outline" onClick={() => { setEditingId("new"); setDraft({ ...STARTER, name: "" }) }}>
-            <PlusIcon /> New template
-          </Button>
-        )}
-      </PageHeader>
+        description="Keep as many templates as you like and pick one from the box. The default one is what every email uses."
+      />
       {templates.error && <ErrorAlert message={templates.error} />}
-
-      {(templates.data?.length ?? 0) > 1 && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {templates.data!.map((t) => (
-            <Button key={t.id} size="sm" variant={editingId === t.id ? "secondary" : "ghost"} onClick={() => open(t)}>
-              {t.is_default && <StarIcon className="fill-current" />} {t.name}
-            </Button>
-          ))}
-        </div>
-      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {editingId === "new" ? "New template" : "Edit template"}
+            <p className="eyebrow">Template</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                items={templateItems}
+                value={editingId === null ? null : String(editingId)}
+                onValueChange={choose}
+              >
+                <SelectTrigger className="w-72 max-w-full" aria-label="Choose a template"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {templateItems.filter((t) => t.value !== "new").map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                      {t.isDefault && <StarIcon className="fill-current text-muted-foreground" aria-label="default" />}
+                    </SelectItem>
+                  ))}
+                  {(templates.data?.length ?? 0) > 0 && <SelectSeparator />}
+                  <SelectItem value="new"><PlusIcon /> New template</SelectItem>
+                </SelectContent>
+              </Select>
               {draft.is_default && <Badge variant="secondary">Default</Badge>}
-            </CardTitle>
+              {dirty && <span className="text-xs text-muted-foreground">Unsaved changes</span>}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1">
@@ -175,15 +232,31 @@ export default function TemplatesPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="body">Body</Label>
-              <Textarea
-                id="body"
+              <Label>Body</Label>
+              <RichTextEditor
+                ariaLabel="Email body"
                 ref={bodyRef}
                 value={draft.body}
                 onFocus={() => (lastField.current = "body")}
-                onChange={(e) => setDraft({ ...draft, body: e.target.value })}
-                className="min-h-72 text-sm"
+                onChange={(body) => setDraft((d) => ({ ...d, body }))}
+                onTextChange={(text) => setWords(countWords(text))}
+                toolbarExtra={
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setSignatureOpen(true)}
+                    title="Edit the signature added to every email"
+                  >
+                    <PenLineIcon /> Signature
+                  </Button>
+                }
               />
+              <p className={cn("text-xs", words > WORD_TARGET ? "text-amber-700" : "text-muted-foreground")}>
+                {words} {words === 1 ? "word" : "words"} ·{" "}
+                {words > WORD_TARGET ? "long for a cold email, aim for under " : "aim for under "}{WORD_TARGET}
+                {signature ? " · signature added at the end" : " · no signature yet"}
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">Insert:</span>
@@ -228,6 +301,25 @@ export default function TemplatesPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={pendingSwitch !== null}
+        onOpenChange={(o) => !o && setPendingSwitch(null)}
+        title="Discard unsaved changes?"
+        description="Your edits to this template haven't been saved. Switching templates will throw them away."
+        confirmLabel="Discard and switch"
+        onConfirm={() => {
+          if (pendingSwitch !== null) switchTo(pendingSwitch)
+          setPendingSwitch(null)
+        }}
+      />
+
+      <SignatureDialog
+        open={signatureOpen}
+        onOpenChange={setSignatureOpen}
+        signature={signature}
+        onSaved={(saved) => settings.setData(() => saved)}
+      />
     </div>
   )
 }

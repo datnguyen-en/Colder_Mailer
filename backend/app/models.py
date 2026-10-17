@@ -46,9 +46,14 @@ class Company(Base):
     # Nullable: a company typed in for a personal-domain contact has no domain of its own.
     domain: Mapped[str | None] = mapped_column(String(255), unique=True)
     notes: Mapped[str | None] = mapped_column(Text)
+    # Template for everyone at this company; None = the default template.
+    template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("templates.id", ondelete="SET NULL")
+    )
     created_at: Mapped[datetime] = _created()
 
     contacts: Mapped[list["Contact"]] = relationship(back_populates="company")
+    template: Mapped["Template | None"] = relationship()
     aliases: Mapped[list["DomainAlias"]] = relationship(
         back_populates="company", cascade="all, delete-orphan"
     )
@@ -87,12 +92,17 @@ class Contact(Base):
     gmail_message_id: Mapped[str | None] = mapped_column(String(100))
     gmail_thread_id: Mapped[str | None] = mapped_column(String(100))
     error: Mapped[str | None] = mapped_column(Text)
+    # This person's own template, overriding the company's; None = use the company's.
+    template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("templates.id", ondelete="SET NULL")
+    )
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     company: Mapped[Company | None] = relationship(back_populates="contacts")
+    template: Mapped["Template | None"] = relationship()
     events: Mapped[list["SendEvent"]] = relationship(
         back_populates="contact", cascade="all, delete-orphan", passive_deletes=True
     )
@@ -100,6 +110,10 @@ class Contact(Base):
     @property
     def company_name(self) -> str | None:
         return self.company.name if self.company else None
+
+    @property
+    def company_template_id(self) -> int | None:
+        return self.company.template_id if self.company else None
 
 
 class Template(Base):
@@ -152,6 +166,8 @@ class AppSettings(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     sender_name: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    # Sanitized HTML, added after a "--" line at the end of every email.
+    signature: Mapped[str] = mapped_column(Text, default="", server_default="")
     resume_storage_key: Mapped[str | None] = mapped_column(String(300))
     resume_filename_pattern: Mapped[str] = mapped_column(
         String(100), default="Eric_Resume_{company}.pdf",

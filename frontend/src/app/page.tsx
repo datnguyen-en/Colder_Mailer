@@ -59,10 +59,10 @@ function StatTile({ label, value, hint }: { label: string; value: string | numbe
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle className="text-sm font-normal text-muted-foreground">{label}</CardTitle>
+        <p className="eyebrow">{label}</p>
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-semibold tabular-nums">{value}</div>
+        <div className="text-4xl font-medium tracking-tight tabular-nums">{value}</div>
         {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
       </CardContent>
     </Card>
@@ -74,7 +74,11 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <PageHeader title="Dashboard" />
+      <PageHeader
+        eyebrow="Overview"
+        title="Dashboard"
+        description="This week's sends and replies, and anything that needs your attention."
+      />
       {error && <ErrorAlert message={error} />}
       {!stats && !error && <Skeleton className="h-64 w-full" />}
       {stats && (

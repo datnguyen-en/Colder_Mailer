@@ -120,6 +120,44 @@ def test_worker_sends_oldest_queued_email(ready, db):
     assert contact(db, second).status == "queued"  # one per run
 
 
+def test_email_is_formatted_with_plain_text_copy_and_signature(ready, db):
+    ready.put("/settings", json={"signature": '<p><strong>Eric Nguyen</strong></p>'
+                                              '<p><a href="https://linkedin.com/in/x">LinkedIn</a></p>'})
+    tid = ready.get("/templates").json()[0]["id"]
+    ready.put(f"/templates/{tid}", json={
+        "name": "Main", "subject": "Internship at [Company]",
+        "body": "<p>Hi [Name],</p><ul><li><p>Offer from <strong>Google</strong></p></li></ul>"})
+    [cid] = add(ready, "jane.doe@stripe.com")
+    queue(ready, cid)
+    fake = FakeGmail()
+    assert worker.process_queue(fake, now=WEDNESDAY_2PM).outcome == "sent"
+
+    msg = message_from_bytes(fake.sent[0], policy=policy.default)
+    html = msg.get_body(("html",)).get_content()
+    assert "<p>Hi Jane,</p><ul><li>Offer from <strong>Google</strong></li></ul><p>--</p>" in html
+    assert '<a href="https://linkedin.com/in/x"' in html
+    assert msg.get_body(("plain",)).get_content().strip() == (
+        "Hi Jane,\n\n- Offer from Google\n\n--\n\nEric Nguyen\n\nLinkedIn (https://linkedin.com/in/x)")
+    assert [a.get_filename() for a in msg.iter_attachments()] == ["Eric_Resume_Stripe.pdf"]
+
+
+def test_worker_uses_the_company_template(ready, db):
+    special = ready.post("/templates", json={
+        "name": "Special", "subject": "Special for [Company]", "body": "<p>Extra effort</p>"}).json()
+    jane, bob = add(ready, "jane.doe@stripe.com", "bob.stone@ramp.com")
+    stripe_id = next(c["id"] for c in ready.get("/companies").json() if c["name"] == "Stripe")
+    ready.patch(f"/companies/{stripe_id}", json={"template_id": special["id"]})
+    queue(ready, jane)
+    queue(ready, bob)
+    fake = FakeGmail()
+
+    worker.process_queue(fake, now=WEDNESDAY_2PM)
+    worker.process_queue(fake, now=WEDNESDAY_2PM)
+
+    subjects = [message_from_bytes(raw, policy=policy.default)["Subject"] for raw in fake.sent]
+    assert subjects == ["Special for Stripe", "Internship at Ramp"]  # Ramp keeps the default
+
+
 def test_contact_without_name_gets_hi_there(ready, db):
     [cid] = add(ready, "zxqv@stripe.com")
     queue(ready, cid)

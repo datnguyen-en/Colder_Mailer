@@ -12,6 +12,9 @@
   "dependencies": {
     "@base-ui/react": "^1.9.0",
     "@supabase/supabase-js": "^2.118.0",
+    "@tiptap/pm": "3.31.3",
+    "@tiptap/react": "3.31.3",
+    "@tiptap/starter-kit": "3.31.3",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "lucide-react": "^1.57.0",
@@ -32,5 +35,9 @@
     "eslint-config-next": "16.4.1",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@tiptap/extension-bubble-menu": "3.31.3",
+    "@tiptap/extension-floating-menu": "3.31.3"
   }
 }

@@ -1,4 +1,4 @@
-# Cold Email Tracker — Build Plan
+# Colder Mailer — Build Plan
 
 > **For Claude Code:** Read this whole file first. Build **one phase at a time**, in order. After each phase, run that phase's acceptance checks, report results, and **stop and wait** before starting the next phase. Ask before changing any decision in "Stack" or "Data model".
 
@@ -129,7 +129,7 @@ Takes the edited preview rows. Creates missing companies; if I edited a company 
      `UPDATE contacts SET status='sending', updated_at=now() WHERE id = (SELECT id FROM contacts WHERE status='queued' ORDER BY queued_at LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING *;`
      Two concurrent workers must never claim the same contact.
   4. Render + validate; on validation error → `failed` with the reason.
-  5. Build MIME (plain text body, PDF attachment with per-company filename, From = sender name + Gmail address) and send via Gmail API.
+  5. Build MIME (HTML body with a plain-text alternative and the signature appended, PDF attachment with per-company filename, From = sender name + Gmail address) and send via Gmail API.
   6. Success → `sent`, store `gmail_message_id` and `gmail_thread_id`. Error → `failed` with the message. **No automatic retry** (the email may have gone out); I requeue manually.
   7. Contacts stuck in `sending` for more than 30 min are shown in the UI with a warning; never auto-resent.
 - Every status change appends a `send_events` row.

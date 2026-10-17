@@ -106,6 +106,7 @@ export default function ImportPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
+        eyebrow="Add people"
         title="Import contacts"
         description="Paste anything with email addresses in it, or upload a CSV export (e.g. from Apollo). Nothing is saved until you import."
       />
@@ -176,7 +177,7 @@ export default function ImportPage() {
               </Button>
             </div>
           </div>
-          <div className="rounded-lg border">
+          <div className="overflow-hidden rounded-3xl border bg-card shadow-soft">
             <Table>
               <TableHeader>
                 <TableRow>

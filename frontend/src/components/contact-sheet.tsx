@@ -6,6 +6,7 @@ import { toast } from "sonner"
 
 import { StatusBadge } from "@/components/badges"
 import { EmailPreviewView } from "@/components/email-preview"
+import { defaultLabel, TemplatePicker } from "@/components/template-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,7 +25,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
-import { patch, type Company, type Contact, type EmailPreview } from "@/lib/api"
+import { patch, type Company, type Contact, type EmailPreview, type Template } from "@/lib/api"
 import { formatDateTime } from "@/lib/format"
 import { useApi } from "@/lib/use-api"
 
@@ -76,6 +77,20 @@ function ContactDetails({
   const [saving, setSaving] = useState(false)
   const preview = useApi<EmailPreview>(`/contacts/${contact.id}/preview`)
   const { reload } = preview
+  const templates = useApi<Template[]>("/templates")
+  const templateList = templates.data ?? []
+  const companyTemplate = templateList.find((t) => t.id === contact.company_template_id)
+  // Who still gets an email; for anyone already emailed the choice no longer matters.
+  const canStillSend = ["new", "queued", "failed"].includes(contact.status)
+
+  async function setTemplate(templateId: number | null) {
+    try {
+      onSaved(await patch<Contact>(`/contacts/${contact.id}`, { template_id: templateId }))
+      reload()
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -151,13 +166,31 @@ function ContactDetails({
           </div>
         </form>
 
+        <div className="space-y-1">
+          <Label>Template</Label>
+          <TemplatePicker
+            templates={templateList}
+            value={contact.template_id}
+            fallbackLabel={companyTemplate
+              ? `Same as ${contact.company_name ?? "company"} · ${companyTemplate.name}`
+              : defaultLabel(templateList)}
+            onChange={setTemplate}
+            disabled={!templates.data || !canStillSend}
+            className="w-full"
+          />
+          <p className="text-xs text-muted-foreground">
+            {canStillSend
+              ? "Only for this person. Set a template for everyone at a company on the Companies page."
+              : "Already emailed, so the template can't change what was sent."}
+          </p>
+        </div>
+
         <div>
           <h3 className="mb-3 text-sm font-medium">Email preview</h3>
           {preview.error && <p className="text-sm text-destructive">{preview.error}</p>}
           {preview.loading && !preview.data && <Skeleton className="h-48 w-full" />}
           {preview.data && <EmailPreviewView preview={preview.data} />}
-          {preview.data && preview.data.problems.length === 0 &&
-            ["new", "queued", "failed"].includes(contact.status) && (
+          {preview.data && preview.data.problems.length === 0 && canStillSend && (
             <Button className="mt-4" onClick={() => onSendNow(contact)}>
               <SendIcon /> Send now
             </Button>

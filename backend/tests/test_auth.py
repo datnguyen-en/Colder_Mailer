@@ -27,6 +27,7 @@ def token(email="me@example.com", **overrides):
 def test_no_token_is_401(auth_on):
     assert auth_on.get("/contacts").status_code == 401
     assert auth_on.post("/parse", json={"text": "a@b.com"}).status_code == 401
+    assert auth_on.get("/resume").status_code == 401  # the resume is personal data
 
 
 def test_bad_or_expired_token_is_401(auth_on):

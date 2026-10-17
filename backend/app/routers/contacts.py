@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app import schemas, services
 from app.db import get_db
-from app.models import Company, Contact
+from app.models import Company, Contact, Template
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
@@ -76,6 +76,8 @@ def update_contact(contact_id: int, req: schemas.ContactUpdate, db: Session = De
     if "company_id" in changes and changes["company_id"] is not None:
         if db.get(Company, changes["company_id"]) is None:
             raise HTTPException(422, "Company not found")
+    if changes.get("template_id") is not None and db.get(Template, changes["template_id"]) is None:
+        raise HTTPException(422, "Template not found")
     for field, value in changes.items():
         setattr(contact, field, (value.strip() or None) if isinstance(value, str) else value)
 
@@ -146,7 +148,7 @@ def unqueue(contact_id: int, db: Session = Depends(get_db)):
 @router.get("/{contact_id}/preview", response_model=schemas.EmailPreview)
 def preview(contact_id: int, db: Session = Depends(get_db)):
     contact = get_contact(db, contact_id)
-    template = services.default_template(db)
+    template = services.template_for(db, contact)
     if template is None:
         raise HTTPException(409, "No default template yet. Create one on the Templates page.")
     return services.preview_email(db, template, contact)

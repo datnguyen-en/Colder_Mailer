@@ -17,6 +17,7 @@ from urllib.parse import urlencode
 import httpx
 import jwt
 
+from app import richtext
 from app.config import get_config
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -108,15 +109,17 @@ def build_message(
     sender_address: str,
     to: str,
     subject: str,
-    body: str,
+    body_html: str,
     attachment_name: str,
     attachment: bytes,
 ) -> bytes:
+    """Formatted HTML body with a plain-text alternative, plus the resume PDF."""
     msg = EmailMessage()
     msg["From"] = formataddr((sender_name, sender_address)) if sender_name else sender_address
     msg["To"] = to
     msg["Subject"] = subject
-    msg.set_content(body)
+    msg.set_content(richtext.to_text(body_html))
+    msg.add_alternative(f'<div dir="ltr">{body_html}</div>', subtype="html")
     msg.add_attachment(attachment, maintype="application", subtype="pdf", filename=attachment_name)
     return msg.as_bytes()
 

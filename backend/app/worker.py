@@ -129,7 +129,9 @@ def deliver(db: Session, contact_id: int, ready: Ready, gmail: GmailClient) -> R
         return RunResult("failed", reason, contact.id)
 
     try:
-        subject, body = templating.render(ready.template, contact, contact.company)
+        template = services.template_for(db, contact) or ready.template
+        subject, body = templating.render(
+            template, contact, contact.company, ready.settings.signature)
     except templating.TemplateError as exc:
         return fail(str(exc))
     if services.was_contacted(db, contact):  # the claim already checks; belt and braces
@@ -140,7 +142,7 @@ def deliver(db: Session, contact_id: int, ready: Ready, gmail: GmailClient) -> R
             sender_address=ready.settings.gmail_address or "",
             to=contact.email,
             subject=subject,
-            body=body,
+            body_html=body,
             attachment_name=templating.resume_filename(
                 ready.settings.resume_filename_pattern, contact.company_name),
             attachment=ready.resume,

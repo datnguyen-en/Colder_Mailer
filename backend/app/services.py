@@ -26,10 +26,22 @@ def default_template(db: Session) -> Template | None:
     return db.scalar(select(Template).where(Template.is_default))
 
 
+def template_for(db: Session, contact: Contact) -> Template | None:
+    """The template this contact gets: their own choice, else their company's,
+    else the default."""
+    if contact.template is not None:
+        return contact.template
+    if contact.company is not None and contact.company.template is not None:
+        return contact.company.template
+    return default_template(db)
+
+
 def preview_email(db: Session, template: templating.TemplateLike, contact: Contact) -> schemas.EmailPreview:
     """Exactly what would be sent to this contact, plus anything blocking it."""
     settings = get_settings(db)
-    subject, body, problems = templating.render_partial(template, contact, contact.company)
+    subject, body, problems = templating.render_partial(
+        template, contact, contact.company, settings.signature
+    )
     if not settings.resume_storage_key:
         problems.append("No resume uploaded")
     return schemas.EmailPreview(

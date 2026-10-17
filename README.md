@@ -1,4 +1,4 @@
-# Cold Email Tracker
+# Colder Mailer
 
 Personal dashboard for internship cold outreach: paste emails → map to companies → fill one template → send through Gmail on a throttled queue → track replies. See [PLAN.md](PLAN.md) for the full design and build phases.
 
@@ -35,11 +35,11 @@ npm run dev                       # http://localhost:3000
 
 The app sends through the Gmail API with the `gmail.send` permission only (it can't read your mail).
 
-1. Go to https://console.cloud.google.com, sign in with the Gmail you'll send from, and **create a project** (e.g. "Cold Email Tracker").
+1. Go to https://console.cloud.google.com, sign in with the Gmail you'll send from, and **create a project** (e.g. "Colder Mailer").
 2. **APIs & Services → Library →** search "Gmail API" → **Enable**.
-3. **Google Auth Platform** (formerly "OAuth consent screen") **→ Get started:** app name "Cold Email Tracker", your Gmail as support and contact email, audience **External**. Create.
+3. **Google Auth Platform** (formerly "OAuth consent screen") **→ Get started:** app name "Colder Mailer", your Gmail as support and contact email, audience **External**. Create. Don't upload a logo: a logo makes Google require full app verification.
 4. **Data Access → Add or remove scopes:** add `.../auth/gmail.send`, plus `openid` and `.../auth/userinfo.email`. Save.
-5. **Audience → Publish app**, so the status says **In production**. In "Testing", Google expires the connection after 7 days. Because the app isn't verified by Google, you'll click through a "Google hasn't verified this app" warning when connecting (Advanced → Go to Cold Email Tracker). That's expected for a personal app.
+5. **Audience → Test users → Add users:** add the Gmail you'll send from. The app stays in **Testing**, where Google expires the connection after 7 days (the dashboard then shows **Reconnect Gmail**). Publishing to **In production** needs a public home page and privacy policy link in **Branding**, which come with the deployed site in Phase 4. Because the app isn't verified by Google, you'll click through a "Google hasn't verified this app" warning when connecting (Advanced → Go to Colder Mailer). That's expected for a personal app.
 6. **Clients → Create client →** type **Web application**. Under **Authorized redirect URIs** add `http://localhost:8000/gmail/callback` (and the production one in Phase 4). Create.
 7. Copy the **Client ID** and **Client secret** into `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and make sure `TOKEN_ENCRYPTION_KEY` is set (`.env.example` shows how to generate one). Restart the backend.
 8. In the dashboard: **Settings → Connect Gmail.**
@@ -87,8 +87,8 @@ curl -s $API/contacts/1/preview                # exact subject/body/attachment n
 - **Dashboard:** this week's sends, companies, replies, reply rate, a sends-per-day chart, recent activity, and warnings (Gmail not connected, no resume, no template, stuck sends).
 - **Import:** paste text or upload a CSV, fix names and companies in the preview, then import the checked rows. Renaming a company updates every row from that domain that had the same guess.
 - **Contacts:** search, filter by status, bulk delete. Click an email to edit the contact and see the exact email it would receive.
-- **Companies:** contact counts per status; click a name to rename it.
-- **Template:** subject and body editor with token buttons and a live preview against any contact.
+- **Companies:** contact counts per status; click a name to rename it; pick a **Template** for a company you want to put extra effort into.
+- **Template:** subject plus a Gmail-style body editor (bold, italic, links, bulleted and numbered lists, ⌘K for links), token buttons, a word count that nudges you under 125 words, a **Signature** button, and a live preview against any contact. The signature is added after a "--" line at the end of every email.
 - **Settings:** resume upload, sender name, filename pattern, daily limit, send window, timezone.
 
 ## Layout
@@ -97,6 +97,7 @@ curl -s $API/contacts/1/preview                # exact subject/body/attachment n
 backend/app/
   parser.py       paste-box parsing (pure): emails, domain → company, name guessing, flags
   templating.py   [Company]/[Name]/[FullName]/[Title] filling + validation, resume filename (pure)
+  richtext.py     email body HTML: allowlist cleaning + the plain-text version (pure)
   services.py     DB logic shared by routers / worker: company resolution, import, status changes
   routers/        parse, contacts, companies, templates, settings (+ resume upload), stats, send, gmail_auth
   gmail.py        OAuth flow, MIME building, sending; errors split into not-sent vs. unclear
@@ -117,5 +118,7 @@ frontend/src/
 - **Company names:** a domain resolves through domain aliases first, then a company with that exact domain, then a company with the same name key (so `amazon.co.uk` finds the company stored as `amazon.com`). If neither matches, the key is title-cased. If you change a company name in the preview, the import saves it and adds a domain alias so the correction sticks.
 - **Flags:** `personal_email`, `generic_inbox`, `needs_name`, `already_contacted` (status beyond `new`), `already_imported` (already in the table as `new`; import will skip it).
 - **One email per address, ever:** once someone has been sent an email (or marked sent, replied or bounced), nothing can queue or send to them again, and they can't be deleted, so re-importing them is skipped. If Gmail doesn't clearly confirm a send (timeout, server error), the contact stays in `sending`, is shown as stuck, and is never retried automatically. Requeueing it asks you to check Gmail's Sent folder first.
+- **Formatting:** template bodies and the signature are stored as HTML and cleaned on every save, preview, and send: only paragraphs, line breaks, bold, italic, lists, and http(s)/mailto/tel links survive. Emails go out as HTML with a plain-text copy, plus the resume.
+- **Which template is sent:** a person's own template (set in their contact drawer), else their company's (Companies page), else the default. The choice is read at send time, and the preview always shows the template that will actually be used.
 - **Templates:** there is always exactly one default template. A missing first name is fine: `[Name]` becomes "there". Rendering fails, listing every problem, if `[Company]` or `[Title]` is used without a value, or any unknown `[...]` / `{...}` placeholder is left.
 - **Manual status changes** (`PATCH /contacts/{id}`) can set `queued`, `sent`, `replied`, `bounced` or `failed`. A contact can only be queued from `new` or `failed`, so nothing already sent gets queued again. `requeue` is only for `failed` contacts, or ones stuck in `sending` for over 30 minutes. `unqueue` takes a queued contact back to `new`.

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app import schemas, services
+from app import richtext, schemas, services
 from app.db import get_db
 from app.models import Template
 from app.routers.contacts import get_contact
@@ -14,7 +14,8 @@ router = APIRouter(prefix="/templates", tags=["templates"])
 
 def _save(db: Session, template: Template, req: schemas.TemplateIn) -> Template:
     current_default = services.default_template(db)  # query before touching the row
-    template.name, template.subject, template.body = req.name, req.subject, req.body
+    template.name, template.subject = req.name, req.subject
+    template.body = richtext.sanitize(req.body)
     db.add(template)
     # There is always exactly one default; it only moves when another is made default.
     if req.is_default or current_default in (None, template):

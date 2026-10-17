@@ -76,6 +76,8 @@ class ContactOut(ORM):
     title: str | None
     company_id: int | None
     company_name: str | None
+    template_id: int | None
+    company_template_id: int | None
     source: str
     status: ContactStatus
     queued_at: datetime | None
@@ -100,6 +102,7 @@ class ContactUpdate(BaseModel):
     last_name: str | None = Field(default=None, max_length=100)
     title: str | None = Field(default=None, max_length=200)
     company_id: int | None = None
+    template_id: int | None = None  # null = use the company's template (or the default)
     # Manual status changes; "new" and "sending" are owned by the app.
     status: Literal["queued", "sent", "replied", "bounced", "failed"] | None = None
 
@@ -120,6 +123,7 @@ class CompanyOut(ORM):
     name: str
     domain: str | None
     notes: str | None
+    template_id: int | None = None
     aliases: list[str] = []
     contact_count: int = 0
     status_counts: dict[str, int] = {}
@@ -130,6 +134,7 @@ class CompanyOut(ORM):
 class CompanyUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     notes: str | None = None
+    template_id: int | None = None  # null = the default template
 
 
 # --- templates ---------------------------------------------------------------
@@ -165,6 +170,7 @@ _PATTERN_RE = re.compile(r"^[A-Za-z0-9._ -]*(\{company\}[A-Za-z0-9._ -]*)?$")
 
 class SettingsOut(ORM):
     sender_name: str
+    signature: str
     resume_uploaded: bool
     resume_filename_pattern: str
     daily_limit: int
@@ -178,6 +184,7 @@ class SettingsOut(ORM):
 
 class SettingsUpdate(BaseModel):
     sender_name: str | None = Field(default=None, max_length=100)
+    signature: str | None = Field(default=None, max_length=5_000)
     resume_filename_pattern: str | None = Field(default=None, min_length=5, max_length=100)
     daily_limit: int | None = Field(default=None, ge=1, le=100)
     send_window_start: str | None = None

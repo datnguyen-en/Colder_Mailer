@@ -18,23 +18,23 @@ def test_fills_all_tokens():
         JANE, STRIPE,
     )
     assert subject == "Internship at Stripe"
-    assert body == "Hi Jane (Jane Doe, University Recruiter) at Stripe"
+    assert body == "<p>Hi Jane (Jane Doe, University Recruiter) at Stripe</p>"
 
 
 def test_tokens_are_case_insensitive():
     subject, body = render(tpl("[COMPANY] / [company]", "Hi [name], [fullNAME]"), JANE, STRIPE)
     assert subject == "Stripe / Stripe"
-    assert body == "Hi Jane, Jane Doe"
+    assert body == "<p>Hi Jane, Jane Doe</p>"
 
 
 def test_missing_name_falls_back_to_there():
     no_name = NS(first_name=None, last_name=None, title=None)
-    assert render(tpl("Hello", "Hi [Name], / [FullName]"), no_name, STRIPE) == ("Hello", "Hi there, / there")
+    assert render(tpl("Hello", "Hi [Name], / [FullName]"), no_name, STRIPE) == ("Hello", "<p>Hi there, / there</p>")
 
 
 def test_blank_name_counts_as_missing():
     _, body = render(tpl("Hello"), NS(first_name="   ", last_name="Doe", title=None), STRIPE)
-    assert body == "Hi there,"
+    assert body == "<p>Hi there,</p>"
 
 
 def test_missing_company_raises():
@@ -44,14 +44,14 @@ def test_missing_company_raises():
 
 def test_missing_title_raises_only_when_used():
     no_title = NS(first_name="Jane", last_name=None, title=None)
-    assert render(tpl("Hi"), no_title, STRIPE) == ("Hi", "Hi Jane,")
+    assert render(tpl("Hi"), no_title, STRIPE) == ("Hi", "<p>Hi Jane,</p>")
     with pytest.raises(TemplateError, match=r"\[Title\]"):
         render(tpl("Hi [Title]"), no_title, STRIPE)
 
 
 def test_fullname_with_first_name_only():
     _, body = render(tpl("Hi", "[FullName]"), NS(first_name="Jane", last_name=None), STRIPE)
-    assert body == "Jane"
+    assert body == "<p>Jane</p>"
 
 
 def test_unknown_token_raises():
@@ -89,13 +89,47 @@ def test_partial_render_leaves_unfilled_tokens_visible():
         tpl("Role at [Company]", "Hi [Name]"), NS(first_name="Jane"), None
     )
     assert subject == "Role at [Company]"
-    assert body == "Hi Jane"
+    assert body == "<p>Hi Jane</p>"
     assert problems == ["[Company] has no value for this contact"]
 
 
 def test_brackets_inside_values_are_not_rescanned():
     subject, _ = render(tpl("At [Company]"), JANE, NS(name="[Stealth]"))
     assert subject == "At [Stealth]"
+
+
+# --- formatted (HTML) bodies -----------------------------------------------
+
+
+def test_html_body_keeps_formatting_and_escapes_values():
+    subject, body = render(
+        tpl("[Company] internship", '<p>Hi <strong>[Name]</strong>, <a href="https://x.com">link</a></p>'),
+        NS(first_name="<b>Jo</b>"), NS(name="AT&T"),
+    )
+    assert subject == "AT&T internship"  # the subject is plain text
+    assert body == ('<p>Hi <strong>&lt;b&gt;Jo&lt;/b&gt;</strong>, '
+                    '<a href="https://x.com" target="_blank" rel="noopener noreferrer">link</a></p>')
+
+
+def test_formatting_inside_a_token_still_fills_it():
+    _, body = render(tpl("Hi", "<p>[<strong>Name</strong>]</p>"), JANE, STRIPE)
+    assert body == "<p>Jane</p>"
+
+
+def test_signature_follows_a_separator_and_can_use_tokens():
+    _, body = render(tpl("Hi", "<p>Hi [Name],</p>"), JANE, STRIPE,
+                     signature="<p><strong>Eric</strong> · [Company] fan</p>")
+    assert body == "<p>Hi Jane,</p><p>--</p><p><strong>Eric</strong> · Stripe fan</p>"
+
+
+def test_blank_signature_adds_nothing():
+    _, body = render(tpl("Hi", "<p>Hi</p>"), JANE, STRIPE, signature="<p> </p>")
+    assert body == "<p>Hi</p>"
+
+
+def test_body_of_only_empty_paragraphs_is_empty():
+    with pytest.raises(TemplateError, match="Body is empty"):
+        render(tpl("Hi", "<p></p><p> </p>"), JANE, STRIPE, signature="<p>Eric</p>")
 
 
 @pytest.mark.parametrize("pattern,company,expected", [

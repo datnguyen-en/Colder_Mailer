@@ -1,16 +1,8 @@
 "use client"
 
 import type { Session } from "@supabase/supabase-js"
-import {
-  Building2Icon,
-  FileTextIcon,
-  LayoutDashboardIcon,
-  LogOutIcon,
-  MailIcon,
-  SettingsIcon,
-  UploadIcon,
-  UsersIcon,
-} from "lucide-react"
+import { LogOutIcon } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -20,12 +12,12 @@ import { authEnabled, supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboardIcon },
-  { href: "/import", label: "Import", icon: UploadIcon },
-  { href: "/contacts", label: "Contacts", icon: UsersIcon },
-  { href: "/companies", label: "Companies", icon: Building2Icon },
-  { href: "/templates", label: "Template", icon: FileTextIcon },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
+  { href: "/", label: "Dashboard" },
+  { href: "/import", label: "Import" },
+  { href: "/contacts", label: "Contacts" },
+  { href: "/companies", label: "Companies" },
+  { href: "/templates", label: "Template" },
+  { href: "/settings", label: "Settings" },
 ]
 
 /** Nav + login gate. With Supabase unconfigured (local dev) everything is open. */
@@ -57,44 +49,47 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!checked || blocked) return null
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="border-b bg-muted/30 md:sticky md:top-0 md:h-screen md:w-56 md:shrink-0 md:border-r md:border-b-0">
-        <div className="flex items-center gap-2 px-4 py-3 md:py-5">
-          <MailIcon className="size-5" />
-          <span className="font-semibold">Cold Email Tracker</span>
-        </div>
-        <nav className="flex gap-1 overflow-x-auto px-2 pb-2 md:flex-col md:pb-0">
-          {NAV.map(({ href, label, icon: Icon }) => {
+    <div className="min-h-screen">
+      <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 pt-4 md:px-8 md:pt-6">
+        <Link
+          href="/"
+          className="flex items-center gap-3 rounded-2xl border bg-background py-2 pr-5 pl-2 shadow-soft"
+        >
+          <Image src="/logo.png" alt="" width={36} height={36} className="size-9 rounded-full" priority />
+          <span className="text-lg font-medium tracking-tight">Colder Mailer</span>
+        </Link>
+        <nav className="flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border bg-background p-1.5 shadow-soft">
+          {NAV.map(({ href, label }) => {
             const active = href === "/" ? pathname === "/" : pathname.startsWith(href)
             return (
               <Link
                 key={href}
                 href={href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                  active && "bg-muted font-medium text-foreground",
+                  "shrink-0 rounded-xl px-4 py-2.5 text-[13px] font-medium tracking-[0.14em] uppercase text-foreground/70 transition-colors hover:text-foreground",
+                  active && "bg-muted text-foreground ring-1 ring-border",
                 )}
               >
-                <Icon className="size-4" />
                 {label}
               </Link>
             )
           })}
-        </nav>
-        <div className="hidden px-4 py-4 text-xs text-muted-foreground md:absolute md:bottom-0 md:block md:w-56">
-          {supabase && session ? (
-            <div className="space-y-2">
-              <div className="truncate">{session.user.email}</div>
-              <Button variant="outline" size="sm" onClick={() => supabase!.auth.signOut()}>
-                <LogOutIcon /> Sign out
-              </Button>
-            </div>
-          ) : (
-            <span>Dev mode: login disabled</span>
+          {supabase && session && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-1 shrink-0"
+              title={`Sign out ${session.user.email}`}
+              aria-label="Sign out"
+              onClick={() => supabase!.auth.signOut()}
+            >
+              <LogOutIcon />
+            </Button>
           )}
-        </div>
-      </aside>
-      <main className="min-w-0 flex-1 px-4 py-6 md:px-8">{children}</main>
+        </nav>
+      </header>
+      <main className="mx-auto max-w-6xl px-4 pb-16 md:px-8">{children}</main>
     </div>
   )
 }

@@ -4,17 +4,25 @@ An email must never go out with an unfilled token, so `render` raises on any
 token it can't fill and on any [...] or {...} placeholder it doesn't know.
 A missing name isn't a blocker: [Name] and [FullName] fall back to "there"
 ("Hi there,"), since the email address is what matters.
+
+The subject is plain text. The body is HTML (see richtext.py): it is sanitized,
+the signature is appended, and token values are HTML-escaped as they go in.
 """
 
+import html
 import re
 import unicodedata
 from typing import Any, Protocol
+
+from app import richtext
 
 TOKEN_RE = re.compile(r"\[([^\[\]\r\n]*)\]")
 # Placeholders from other tools ({first_name}, {{company}}) would go out literally.
 CURLY_RE = re.compile(r"\{\{?\s*[A-Za-z_]+\s*\}?\}")
 KNOWN_TOKENS = ("company", "name", "fullname", "title")
 NAME_FALLBACK = "there"
+TAG_RE = re.compile(r"<[^>]*>")
+SIGNATURE_SEPARATOR = "<p>--</p>"
 
 
 class TemplateLike(Protocol):
@@ -43,40 +51,54 @@ def token_values(contact: Any, company: Any) -> dict[str, str]:
     }
 
 
+def body_html(body: str, signature: str = "") -> str:
+    """The sanitized body, with the signature after a "--" line if there is one."""
+    html_body = richtext.sanitize(body)
+    sig = richtext.sanitize(signature)
+    if richtext.to_text(sig):
+        html_body += SIGNATURE_SEPARATOR + sig
+    return html_body
+
+
 def render_partial(
-    template: TemplateLike, contact: Any, company: Any
+    template: TemplateLike, contact: Any, company: Any, signature: str = ""
 ) -> tuple[str, str, list[str]]:
     """Fill what can be filled; leave the rest in place and list the problems.
-    Used by the live editor preview."""
+    Returns (subject text, body HTML, problems). Used by the live editor preview."""
     values = token_values(contact, company)
     problems: list[str] = []
 
-    def fill(match: re.Match[str]) -> str:
-        token = match.group(1)
-        key = token.lower()
-        if key not in KNOWN_TOKENS:
-            problems.append(f"Unknown token [{token}]")
-            return match.group(0)
-        if not values[key]:
-            problems.append(f"[{token}] has no value for this contact")
-            return match.group(0)
-        return values[key]
+    def filler(escape: bool):
+        def fill(match: re.Match[str]) -> str:
+            token = TAG_RE.sub("", match.group(1))  # [<strong>Name</strong>] counts as [Name]
+            key = token.lower()
+            if key not in KNOWN_TOKENS:
+                problems.append(f"Unknown token [{token}]")
+                return match.group(0)
+            if not values[key]:
+                problems.append(f"[{token}] has no value for this contact")
+                return match.group(0)
+            return html.escape(values[key]) if escape else values[key]
+        return fill
 
-    subject = TOKEN_RE.sub(fill, template.subject or "")
-    body = TOKEN_RE.sub(fill, template.body or "")
-    for text in (template.subject or "", template.body or ""):
+    source_body = body_html(template.body or "", signature)
+    subject = TOKEN_RE.sub(filler(escape=False), template.subject or "")
+    body = TOKEN_RE.sub(filler(escape=True), source_body)
+    for text in (template.subject or "", source_body):
         for match in CURLY_RE.finditer(text):
             problems.append(f"Unknown placeholder {match.group(0)}")
     if not subject.strip():
         problems.append("Subject is empty")
-    if not body.strip():
+    if not richtext.to_text(richtext.sanitize(template.body or "")):
         problems.append("Body is empty")
     return subject, body, list(dict.fromkeys(problems))
 
 
-def render(template: TemplateLike, contact: Any, company: Any) -> tuple[str, str]:
-    """(subject, body) with every token filled, or TemplateError."""
-    subject, body, problems = render_partial(template, contact, company)
+def render(
+    template: TemplateLike, contact: Any, company: Any, signature: str = ""
+) -> tuple[str, str]:
+    """(subject text, body HTML) with every token filled, or TemplateError."""
+    subject, body, problems = render_partial(template, contact, company, signature)
     if problems:
         raise TemplateError(problems)
     return subject, body

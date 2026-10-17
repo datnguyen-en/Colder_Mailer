@@ -33,6 +33,9 @@ export type Contact = {
   title: string | null
   company_id: number | null
   company_name: string | null
+  /** This person's own template; null = the company's (or the default). */
+  template_id: number | null
+  company_template_id: number | null
   source: string
   status: ContactStatus
   queued_at: string | null
@@ -60,6 +63,8 @@ export type Company = {
   name: string
   domain: string | null
   notes: string | null
+  /** null = the default template */
+  template_id: number | null
   aliases: string[]
   contact_count: number
   status_counts: Partial<Record<ContactStatus, number>>
@@ -78,6 +83,7 @@ export type Template = {
 
 export type Settings = {
   sender_name: string
+  signature: string
   resume_uploaded: boolean
   resume_filename_pattern: string
   daily_limit: number
@@ -132,7 +138,8 @@ function errorMessage(body: unknown, fallback: string): string {
   return fallback
 }
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** fetch() against the API with the login token attached. Throws ApiError on any non-2xx. */
+async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers)
   if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json")
   if (supabase) {
@@ -150,10 +157,26 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (res.status === 401 && supabase) {
     await supabase.auth.signOut() // AppShell sees the session end and goes to /login
   }
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new ApiError(res.status, errorMessage(body, `Request failed (${res.status})`))
+  }
+  return res
+}
+
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await apiFetch(path, init)
   if (res.status === 204) return undefined as T
-  const body = await res.json().catch(() => null)
-  if (!res.ok) throw new ApiError(res.status, errorMessage(body, `Request failed (${res.status})`))
-  return body as T
+  return (await res.json().catch(() => null)) as T
+}
+
+/** Save the stored resume under `filename`: the same file and name a recipient gets. */
+export async function downloadResume(filename: string): Promise<void> {
+  const blob = await (await apiFetch("/resume")).blob()
+  const url = URL.createObjectURL(blob)
+  const link = Object.assign(document.createElement("a"), { href: url, download: filename })
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 export const post = <T>(path: string, body?: unknown) =>

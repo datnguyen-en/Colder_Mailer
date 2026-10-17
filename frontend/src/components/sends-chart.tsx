@@ -39,12 +39,12 @@ export function SendsChart({ days }: { days: Day[] }) {
                 onBlur={() => setActive(null)}
               >
                 <div
-                  className="w-full max-w-6 rounded-t bg-bar transition-opacity group-hover:opacity-80 group-focus-visible:ring-2 group-focus-visible:ring-ring"
+                  className="w-full max-w-6 rounded-t-md bg-bar transition-opacity group-hover:opacity-80 group-focus-visible:ring-2 group-focus-visible:ring-ring"
                   style={{ height: d.sent ? `${(d.sent / top) * 100}%` : 0 }}
                 />
                 {active === i && (
                   <div
-                    className="pointer-events-none absolute bottom-full z-10 mb-1 rounded-md border bg-popover px-2 py-1 text-xs whitespace-nowrap text-popover-foreground shadow-md"
+                    className="pointer-events-none absolute bottom-full z-10 mb-1 rounded-xl border bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground shadow-soft"
                     style={{
                       left: i < 3 ? 0 : i > days.length - 4 ? "auto" : "50%",
                       right: i > days.length - 4 ? 0 : "auto",

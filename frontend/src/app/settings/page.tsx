@@ -14,7 +14,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { api, put, type Settings } from "@/lib/api"
 import { useApi } from "@/lib/use-api"
 
-type Form = Omit<Settings, "resume_uploaded" | "gmail_address" | "gmail_connected">
+// The signature is edited in its own dialog on the Template page.
+type Form = Omit<Settings, "resume_uploaded" | "gmail_address" | "gmail_connected" | "signature">
 
 const TIMEZONES = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : []
 
@@ -84,7 +85,11 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Settings" />
+      <PageHeader
+        eyebrow="Setup"
+        title="Settings"
+        description="Gmail connection, resume, and how fast emails go out."
+      />
       {error && <ErrorAlert message={error} />}
       {!data && !error && <Skeleton className="h-96 w-full" />}
       {data && form && (

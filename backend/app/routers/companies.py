@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app import schemas
 from app.db import get_db
-from app.models import Company, Contact
+from app.models import Company, Contact, Template
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -30,6 +30,7 @@ def _with_counts(db: Session, companies: list[Company]) -> list[schemas.CompanyO
             name=company.name,
             domain=company.domain,
             notes=company.notes,
+            template_id=company.template_id,
             aliases=sorted(a.domain for a in company.aliases),
             contact_count=sum(status_counts[company.id].values()),
             status_counts=status_counts[company.id],
@@ -53,7 +54,10 @@ def update_company(company_id: int, req: schemas.CompanyUpdate, db: Session = De
     company = db.get(Company, company_id, options=[selectinload(Company.aliases)])
     if company is None:
         raise HTTPException(404, "Company not found")
-    for field, value in req.model_dump(exclude_unset=True).items():
+    changes = req.model_dump(exclude_unset=True)
+    if changes.get("template_id") is not None and db.get(Template, changes["template_id"]) is None:
+        raise HTTPException(422, "Template not found")
+    for field, value in changes.items():
         if field == "name" and not (value or "").strip():
             raise HTTPException(422, "Name can't be empty")
         setattr(company, field, value.strip() if isinstance(value, str) else value)

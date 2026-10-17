@@ -58,7 +58,7 @@ def test_parse_import_preview_flow(client, db):
 
     preview = client.get(f"/contacts/{jane['id']}/preview").json()
     assert preview["subject"] == "Software internship at Stripe"
-    assert preview["body"].startswith("Hi Jane,")
+    assert preview["body"].startswith("<p>Hi Jane,</p>")
     assert preview["attachment_name"] == "Eric_Resume_Stripe.pdf"
     assert preview["to"] == "jane.doe@stripe.com"
     assert preview["problems"] == ["No resume uploaded"]
@@ -73,7 +73,7 @@ def test_preview_without_name_uses_there(client):
     client.post("/templates", json=TEMPLATE)
     c = add_contact(client, "zxqv@ramp.com")  # no name
     preview = client.get(f"/contacts/{c['id']}/preview").json()
-    assert preview["body"].startswith("Hi there,")
+    assert preview["body"].startswith("<p>Hi there,</p>")
     assert preview["problems"] == ["No resume uploaded"]
 
 
@@ -307,13 +307,41 @@ def test_first_template_becomes_default_and_default_moves(client):
     assert res.json()["is_default"] is True
 
 
+def test_template_choice_person_then_company_then_default(client):
+    default = client.post("/templates", json=TEMPLATE).json()
+    special = client.post("/templates", json={**TEMPLATE, "name": "Special", "subject": "Special for [Company]"}).json()
+    personal = client.post("/templates", json={**TEMPLATE, "name": "Personal", "subject": "Just for [Name]"}).json()
+    assert default["is_default"] and not special["is_default"]
+    jane = add_contact(client, "jane.doe@stripe.com")
+    subject = lambda: client.get(f"/contacts/{jane['id']}/preview").json()["subject"]
+
+    assert subject() == "Software internship at Stripe"  # nothing chosen: default
+
+    res = client.patch(f"/companies/{jane['company_id']}", json={"template_id": special["id"]})
+    assert res.status_code == 200 and res.json()["template_id"] == special["id"]
+    assert subject() == "Special for Stripe"  # the company's choice
+
+    res = client.patch(f"/contacts/{jane['id']}", json={"template_id": personal["id"]})
+    assert res.json()["template_id"] == personal["id"]
+    assert res.json()["company_template_id"] == special["id"]
+    assert subject() == "Just for Jane"  # the person's choice wins
+
+    client.patch(f"/contacts/{jane['id']}", json={"template_id": None})
+    assert subject() == "Special for Stripe"  # back to the company's
+    client.patch(f"/companies/{jane['company_id']}", json={"template_id": None})
+    assert subject() == "Software internship at Stripe"  # back to the default
+
+    assert client.patch(f"/contacts/{jane['id']}", json={"template_id": 9999}).status_code == 422
+    assert client.patch(f"/companies/{jane['company_id']}", json={"template_id": 9999}).status_code == 422
+
+
 def test_template_live_preview(client):
     c = add_contact(client, "jane.doe@stripe.com")
     res = client.post("/templates/preview", json={
         "subject": "Hi [name] from [Unknown]", "body": "[Company]", "contact_id": c["id"]})
     body = res.json()
     assert body["subject"] == "Hi Jane from [Unknown]"
-    assert body["body"] == "Stripe"
+    assert body["body"] == "<p>Stripe</p>"
     assert "Unknown token [Unknown]" in body["problems"]
 
 
@@ -325,6 +353,10 @@ def test_settings_defaults_and_update(client):
     assert s["daily_limit"] == 25 and s["send_days"] == "Mon-Fri"
     assert s["timezone"] == "America/New_York" and s["resume_uploaded"] is False
     assert "gmail_refresh_token_encrypted" not in s
+
+    res = client.put("/settings", json={"signature": '<p onclick="x"><b>Eric</b><script>1</script></p>'})
+    assert res.json()["signature"] == "<p><strong>Eric</strong></p>"  # cleaned before saving
+    assert client.put("/settings", json={"signature": "<p> </p>"}).json()["signature"] == ""
 
     res = client.put("/settings", json={"sender_name": "Eric", "daily_limit": 10,
                                         "send_days": "Mon,Wed,Fri", "timezone": "Asia/Ho_Chi_Minh"})
@@ -339,9 +371,13 @@ def test_settings_defaults_and_update(client):
 
 
 def test_resume_upload(client):
+    assert client.get("/resume").status_code == 404
     pdf = b"%PDF-1.7\n" + b"x" * 100
     res = client.post("/resume", files={"file": ("cv.pdf", pdf, "application/pdf")})
     assert res.status_code == 200 and res.json()["resume_uploaded"] is True
+    res = client.get("/resume")
+    assert res.status_code == 200 and res.content == pdf
+    assert res.headers["content-type"] == "application/pdf"
 
     res = client.post("/resume", files={"file": ("cv.pdf", b"not a pdf", "application/pdf")})
     assert res.status_code == 415

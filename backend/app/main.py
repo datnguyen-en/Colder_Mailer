@@ -9,7 +9,7 @@ from app.services import AlreadyContacted
 
 config = get_config()  # fails fast on bad config (e.g. AUTH_DISABLED in prod)
 
-app = FastAPI(title="Cold Email Tracker API")
+app = FastAPI(title="Colder Mailer API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.cors_origin_list,
