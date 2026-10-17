@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
@@ -43,8 +44,21 @@ def preview_email(db: Session, template: templating.TemplateLike, contact: Conta
 
 
 def is_stuck(contact: Contact, now: datetime | None = None) -> bool:
+    """In `sending` for too long, or Gmail's answer was unclear (error is set).
+    Either way it may have gone out, so it's never resent automatically."""
     now = now or datetime.now(UTC)
-    return contact.status == "sending" and now - contact.updated_at > STUCK_AFTER
+    return contact.status == "sending" and (
+        contact.error is not None or now - contact.updated_at > STUCK_AFTER
+    )
+
+
+def sent_on_day(db: Session, tz: str, when: datetime) -> int:
+    """Emails sent on `when`'s calendar day in timezone `tz`."""
+    day = when.astimezone(ZoneInfo(tz)).date()
+    local_day = func.date(func.timezone(tz, SendEvent.created_at))
+    return db.scalar(
+        select(func.count()).where(SendEvent.event == "sent", local_day == day)
+    ) or 0
 
 
 # --- companies ---------------------------------------------------------------

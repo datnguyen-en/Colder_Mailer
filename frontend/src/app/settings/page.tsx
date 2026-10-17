@@ -1,9 +1,10 @@
 "use client"
 
-import { CheckCircle2Icon, FileUpIcon, Loader2Icon, MailIcon } from "lucide-react"
-import { useRef, useState } from "react"
+import { CheckCircle2Icon, FileUpIcon, Loader2Icon } from "lucide-react"
+import { Suspense, useRef, useState } from "react"
 import { toast } from "sonner"
 
+import { GmailCard } from "@/components/gmail-card"
 import { ErrorAlert, PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -88,22 +89,9 @@ export default function SettingsPage() {
       {!data && !error && <Skeleton className="h-96 w-full" />}
       {data && form && (
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><MailIcon className="size-4" /> Gmail</CardTitle>
-              <CardDescription>Emails are sent from your Gmail account.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-center justify-between gap-3">
-              {data.gmail_connected ? (
-                <span className="flex items-center gap-2 text-sm">
-                  <CheckCircle2Icon className="size-4 text-emerald-600" /> Connected as {data.gmail_address}
-                </span>
-              ) : (
-                <span className="text-sm text-muted-foreground">Not connected</span>
-              )}
-              <Button variant="outline" disabled title="Arrives in Phase 3">Connect Gmail</Button>
-            </CardContent>
-          </Card>
+          <Suspense fallback={<Skeleton className="h-28 w-full" />}>
+            <GmailCard />
+          </Suspense>
 
           <Card>
             <CardHeader>

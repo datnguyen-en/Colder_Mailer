@@ -29,6 +29,15 @@ class Config(BaseSettings):
     storage_backend: Literal["local", "supabase"] = "local"
     local_storage_dir: Path = BACKEND_DIR / "uploads"
 
+    # Gmail OAuth (Google Cloud "Web application" client)
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/gmail/callback"
+    # Where the OAuth callback sends the browser afterwards
+    frontend_url: str = "http://localhost:3000"
+    # Fernet key that encrypts the stored Gmail refresh token
+    token_encryption_key: str = ""
+
     @model_validator(mode="after")
     def _check(self) -> "Config":
         if self.env == "prod" and self.auth_disabled:

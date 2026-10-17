@@ -43,13 +43,14 @@ import {
   type Company,
   type Contact,
   type ContactPage,
+  type QueueResult,
+  type SendNowResult,
 } from "@/lib/api"
 import { formatDate, fullName } from "@/lib/format"
 import { useApi } from "@/lib/use-api"
 
 const PAGE_SIZE = 50
 const ALL = "all"
-const SENDING_LATER = "Sending arrives in Phase 3 (Gmail)"
 
 export default function ContactsPage() {
   return (
@@ -73,6 +74,8 @@ function Contacts() {
   const [open, setOpen] = useState<Contact | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<number[] | null>(null)
   const [confirmRequeue, setConfirmRequeue] = useState<Contact | null>(null)
+  const [confirmSend, setConfirmSend] = useState<Contact | null>(null)
+  const [sendingId, setSendingId] = useState<number | null>(null)
 
   const query = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) })
   if (status !== ALL) query.set("status", status)
@@ -110,6 +113,35 @@ function Contacts() {
     try {
       replaceContact(await post<Contact>(`/contacts/${contact.id}/${path}`))
       toast.success(done)
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
+  }
+
+  async function sendNow(contact: Contact) {
+    setSendingId(contact.id)
+    try {
+      const res = await post<SendNowResult>("/send/now", { contact_id: contact.id })
+      replaceContact(res.contact)
+      if (res.outcome === "sent") toast.success(`Sent to ${contact.email}`)
+      else if (res.outcome === "failed") toast.error(`Not sent: ${res.detail}`)
+      else toast.warning(`Gmail didn't confirm the send to ${contact.email}. Check your Sent folder.`)
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setSendingId(null)
+    }
+  }
+
+  async function queueSelected() {
+    try {
+      const res = await post<QueueResult>("/send/queue", { contact_ids: [...selected] })
+      toast.success(`Queued ${res.queued} email${res.queued === 1 ? "" : "s"}. About one goes out every 15 minutes during your send window.`)
+      if (res.skipped.length) {
+        toast.info(`Skipped ${res.skipped.length}: ${res.skipped.map((s) => `${s.email} (${s.reason})`).join(", ")}`)
+      }
+      setSelected(new Set())
+      reload()
     } catch (e) {
       toast.error((e as Error).message)
     }
@@ -162,7 +194,7 @@ function Contacts() {
         {selected.size > 0 && (
           <div className="flex items-center gap-2 sm:ml-auto">
             <span className="text-sm text-muted-foreground">{selected.size} selected</span>
-            <Button size="sm" disabled title={SENDING_LATER}>
+            <Button size="sm" onClick={queueSelected}>
               <SendIcon /> Queue
             </Button>
             <Button size="sm" variant="destructive" onClick={() => setConfirmDelete([...selected])}>
@@ -240,7 +272,11 @@ function Contacts() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => setOpen(c)}>Preview & edit</DropdownMenuItem>
-                      <DropdownMenuItem disabled title={SENDING_LATER}>Send now</DropdownMenuItem>
+                      {["new", "queued", "failed"].includes(c.status) && (
+                        <DropdownMenuItem disabled={sendingId !== null} onClick={() => setConfirmSend(c)}>
+                          Send now
+                        </DropdownMenuItem>
+                      )}
                       {c.status !== "replied" && (
                         <DropdownMenuItem onClick={() => action(c, "mark-replied", "Marked as replied")}>
                           Mark replied
@@ -285,6 +321,16 @@ function Contacts() {
         companies={companies ?? []}
         onClose={() => setOpen(null)}
         onSaved={replaceContact}
+        onSendNow={setConfirmSend}
+      />
+      <ConfirmDialog
+        open={confirmSend !== null}
+        onOpenChange={(o) => !o && setConfirmSend(null)}
+        title={`Send to ${confirmSend?.email} now?`}
+        description="It goes out from your Gmail right away and can't be unsent. Each address only ever gets one email."
+        confirmLabel="Send now"
+        destructive={false}
+        onConfirm={() => confirmSend && sendNow(confirmSend)}
       />
       <ConfirmDialog
         open={confirmRequeue !== null}

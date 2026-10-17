@@ -166,3 +166,18 @@ export const patch = <T>(path: string, body: unknown) =>
   api<T>(path, { method: "PATCH", body: JSON.stringify(body) })
 
 export const del = (path: string) => api<void>(path, { method: "DELETE" })
+
+export type GmailStatus = {
+  oauth_configured: boolean
+  connected: boolean
+  address: string | null
+  needs_reconnect: boolean
+}
+
+export type SendNowResult = {
+  outcome: "sent" | "failed" | "unknown"
+  detail: string
+  contact: Contact
+}
+
+export type QueueResult = { queued: number; skipped: { email: string; reason: string }[] }

@@ -1,6 +1,6 @@
 "use client"
 
-import { Loader2Icon } from "lucide-react"
+import { Loader2Icon, SendIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -36,17 +36,20 @@ export function ContactSheet({
   companies,
   onClose,
   onSaved,
+  onSendNow,
 }: {
   contact: Contact | null
   companies: Company[]
   onClose: () => void
   onSaved: (contact: Contact) => void
+  onSendNow: (contact: Contact) => void
 }) {
   return (
     <Sheet open={contact !== null} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl data-[side=right]:sm:max-w-xl">
         {contact && (
-          <ContactDetails key={contact.id} contact={contact} companies={companies} onSaved={onSaved} />
+          <ContactDetails key={contact.id} contact={contact} companies={companies}
+            onSaved={onSaved} onSendNow={onSendNow} />
         )}
       </SheetContent>
     </Sheet>
@@ -57,10 +60,12 @@ function ContactDetails({
   contact,
   companies,
   onSaved,
+  onSendNow,
 }: {
   contact: Contact
   companies: Company[]
   onSaved: (contact: Contact) => void
+  onSendNow: (contact: Contact) => void
 }) {
   const [form, setForm] = useState({
     first_name: contact.first_name ?? "",
@@ -151,6 +156,12 @@ function ContactDetails({
           {preview.error && <p className="text-sm text-destructive">{preview.error}</p>}
           {preview.loading && !preview.data && <Skeleton className="h-48 w-full" />}
           {preview.data && <EmailPreviewView preview={preview.data} />}
+          {preview.data && preview.data.problems.length === 0 &&
+            ["new", "queued", "failed"].includes(contact.status) && (
+            <Button className="mt-4" onClick={() => onSendNow(contact)}>
+              <SendIcon /> Send now
+            </Button>
+          )}
         </div>
       </div>
     </>

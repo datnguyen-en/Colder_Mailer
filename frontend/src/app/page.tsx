@@ -19,6 +19,12 @@ const WARNINGS: Record<string, { title: string; body: string; href: string; acti
     href: "/settings",
     action: "Open settings",
   },
+  gmail_reconnect: {
+    title: "Gmail needs reconnecting",
+    body: "The connection stopped working, so sending is paused. Queued emails will go out once you reconnect.",
+    href: "/settings",
+    action: "Reconnect",
+  },
   no_resume: {
     title: "No resume uploaded",
     body: "Every email attaches your resume, so sending is blocked without one.",
@@ -33,7 +39,7 @@ const WARNINGS: Record<string, { title: string; body: string; href: string; acti
   },
   stuck_sending: {
     title: "Some sends are stuck",
-    body: "Contacts have been 'sending' for over 30 minutes. Check Gmail's Sent folder before requeueing.",
+    body: "Gmail didn't clearly confirm some sends. Check Gmail's Sent folder before requeueing, so nobody gets two emails.",
     href: "/contacts?status=sending",
     action: "Review",
   },

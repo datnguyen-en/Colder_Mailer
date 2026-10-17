@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, literal_column, select
+from sqlalchemy import func, literal_column, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app import schemas, services
@@ -41,7 +41,8 @@ def stats(db: Session = Depends(get_db)):
 
     stuck = db.scalar(select(func.count()).where(
         Contact.status == "sending",
-        Contact.updated_at < datetime.now(UTC) - services.STUCK_AFTER,
+        or_(Contact.error.is_not(None),
+            Contact.updated_at < datetime.now(UTC) - services.STUCK_AFTER),
     )) or 0
 
     events = db.scalars(
@@ -53,7 +54,7 @@ def stats(db: Session = Depends(get_db)):
 
     warnings = []
     if not settings.gmail_refresh_token_encrypted:
-        warnings.append("gmail_disconnected")
+        warnings.append("gmail_reconnect" if settings.gmail_address else "gmail_disconnected")
     if not settings.resume_storage_key:
         warnings.append("no_resume")
     if services.default_template(db) is None:

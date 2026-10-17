@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 
 from app.auth import require_user
 from app.config import get_config
-from app.routers import companies, contacts, parse, settings, stats, templates
+from app.routers import companies, contacts, gmail_auth, parse, send, settings, stats, templates
 from app.services import AlreadyContacted
 
 config = get_config()  # fails fast on bad config (e.g. AUTH_DISABLED in prod)
@@ -17,8 +17,10 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-for module in (parse, contacts, companies, templates, settings, stats):
+for module in (parse, contacts, companies, templates, settings, stats, send):
     app.include_router(module.router, dependencies=[Depends(require_user)])
+# Per-route auth: Google's redirect to /gmail/callback carries a signed state instead.
+app.include_router(gmail_auth.router)
 
 
 @app.exception_handler(AlreadyContacted)

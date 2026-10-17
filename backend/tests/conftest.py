@@ -14,6 +14,9 @@ os.environ.update(
     SUPABASE_URL="",
     STORAGE_BACKEND="local",
     LOCAL_STORAGE_DIR=tempfile.mkdtemp(prefix="cold-email-test-"),
+    GOOGLE_CLIENT_ID="test-client-id",
+    GOOGLE_CLIENT_SECRET="test-client-secret",
+    TOKEN_ENCRYPTION_KEY="kJ0V3pWbqgYqH6vO5r2yQ9nF8sT1uX4zA7cD0eG3hI8=",
 )
 
 from pathlib import Path  # noqa: E402
