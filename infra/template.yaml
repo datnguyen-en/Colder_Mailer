@@ -1,0 +1,76 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Colder Mailer: the API (FastAPI on a Lambda Function URL) and the sender
+  (a Lambda that EventBridge Scheduler runs every 15 minutes). Secrets are read
+  from SSM Parameter Store under SsmPrefix. Build first with infra/build.sh.
+
+Parameters:
+  SsmPrefix:
+    Type: String
+    Default: /colder-mailer/prod
+    Description: SSM path holding the app's settings (written by infra/push_secrets.py)
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [x86_64]
+    CodeUri: .build/lambda
+    MemorySize: 512
+    Environment:
+      Variables:
+        ENV: prod
+        SSM_PREFIX: !Ref SsmPrefix
+    Policies:
+      - Statement:
+          - Effect: Allow
+            Action: ssm:GetParametersByPath
+            Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SsmPrefix}"
+
+Resources:
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Colder Mailer API
+      Handler: app.aws.api.handler
+      Timeout: 30
+      FunctionUrlConfig:
+        AuthType: NONE # the app itself checks the Supabase login on every request
+
+  SenderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Sends at most one queued email per run
+      Handler: app.aws.sender.handler
+      Timeout: 90
+      # Nothing is ever retried automatically (PLAN.md): no Lambda retries...
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
+      Events:
+        Every15Minutes:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(15 minutes)
+            # ...and no scheduler retries either; the next run is 15 minutes away.
+            RetryPolicy:
+              MaximumRetryAttempts: 0
+
+  # Keep logs for 30 days instead of forever.
+  ApiLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ApiFunction}
+      RetentionInDays: 30
+  SenderLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${SenderFunction}
+      RetentionInDays: 30
+
+Outputs:
+  ApiUrl:
+    Description: The API's address (NEXT_PUBLIC_API_URL on Vercel; add /gmail/callback in Google Cloud)
+    Value: !GetAtt ApiFunctionUrl.FunctionUrl
+  SenderFunctionName:
+    Description: Run it by hand with infra/run_sender.sh
+    Value: !Ref SenderFunction

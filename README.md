@@ -2,7 +2,7 @@
 
 Personal dashboard for internship cold outreach: paste emails → map to companies → fill one template → send through Gmail on a throttled queue → track replies. See [PLAN.md](PLAN.md) for the full design and build phases.
 
-**Status:** Phases 1–3 are built: backend, dashboard, and Gmail sending (local). Deploying (Phase 4) is next.
+**Status:** Phases 1–3 are built: backend, dashboard, and Gmail sending (local). Deploying (Phase 4) is in progress; see [Deploy](#deploy-phase-4).
 
 ## Local development
 
@@ -81,6 +81,40 @@ curl -s -X POST $API/templates -H "$J" \
 curl -s "$API/contacts" | jq '.items[] | {id, email, status}'
 curl -s $API/contacts/1/preview                # exact subject/body/attachment name + problems
 ```
+
+## Deploy (Phase 4)
+
+Production runs on **Supabase** (database, login, resume storage), **AWS Lambda** (the API and a sender that runs every 15 minutes), and **Vercel** (the website). Production settings live in `.env.prod` (git-ignored; template: `.env.prod.example`) and are copied to AWS SSM Parameter Store.
+
+Tools: `brew install aws-sam-cli`, plus the AWS CLI logged in to **your personal AWS account** (`aws sts get-caller-identity` shows which account).
+
+### 1. Supabase
+
+1. New project (region **East US (North Virginia)**, to sit next to AWS `us-east-1`); save the database password.
+2. **Storage → New bucket** `resumes`, **Public OFF**.
+3. **Authentication → Users → Add user**: your email, **Auto Confirm User** on. Login is by magic link, and only existing users can sign in.
+4. **Authentication → URL Configuration**: Site URL and Redirect URLs for the website (`http://localhost:3000/**` for local testing, the Vercel address later).
+5. Fill the Supabase values in `.env.prod` (project URL, publishable and secret keys, the **Transaction pooler** URI as `DATABASE_URL`, the **Session pooler** URI as `MIGRATIONS_DATABASE_URL`).
+6. Create the tables:
+
+   ```bash
+   cd backend && ENV_FILE=../.env.prod uv run alembic upgrade head
+   ```
+
+### 2. AWS Lambda
+
+```bash
+python3 infra/push_secrets.py   # .env.prod -> SSM SecureStrings under /colder-mailer/prod/
+infra/deploy.sh                 # build + deploy; prints ApiUrl
+```
+
+The first deploy prints the API address (`ApiUrl`). Then:
+
+1. Set `GOOGLE_REDIRECT_URI=<ApiUrl>gmail/callback` in `.env.prod`, and add the same URI to the Google Cloud OAuth client (**Clients → your client → Authorized redirect URIs**).
+2. `python3 infra/push_secrets.py && infra/deploy.sh` again. Lambdas read settings when they start, so redeploy after any settings change.
+3. `infra/run_sender.sh` runs the sender once now instead of waiting for the schedule.
+
+The sender never retries on its own: both Lambda and EventBridge Scheduler retries are off, matching the "nothing is resent automatically" rule. Logs are kept 30 days (CloudWatch → Log groups → `/aws/lambda/colder-mailer-…`).
 
 ## Dashboard pages
 

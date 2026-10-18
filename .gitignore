@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.prod.example
 credentials*.json
 token*.json
 client_secret*.json
@@ -31,3 +32,6 @@ samconfig.toml
 cache/
 
 .DS_Store
+
+# Lambda package (infra/build.sh)
+infra/.build/

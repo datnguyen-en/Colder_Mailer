@@ -13,8 +13,11 @@ target_metadata = Base.metadata
 
 
 def database_url() -> str:
-    # Tests pass their own URL via `config.attributes`; otherwise use the app config.
-    return context.config.attributes.get("database_url") or get_config().database_url
+    # Tests pass their own URL via `config.attributes`; otherwise the app config
+    # (MIGRATIONS_DATABASE_URL, for Supabase's session pooler, if set).
+    config = get_config()
+    return (context.config.attributes.get("database_url")
+            or config.migrations_database_url or config.database_url)
 
 
 def run_migrations_offline() -> None:
