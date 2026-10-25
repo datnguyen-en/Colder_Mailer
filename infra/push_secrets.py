@@ -3,15 +3,16 @@
     python3 infra/push_secrets.py            # uses ../.env.prod
     python3 infra/push_secrets.py --dry-run  # list what would be written
 
-Values never appear in the output or in the process list (they go to the
-AWS CLI on stdin). After changing settings, run infra/deploy.sh again so the
-Lambdas restart and read them.
+Values never appear in the output or in the process list (the AWS CLI reads
+a private temporary JSON file, deleted after each call). After changing settings,
+run infra/deploy.sh again so the Lambdas restart and read them.
 """
 
 import argparse
 import json
 import re
 import subprocess
+import tempfile
 from pathlib import Path
 
 PREFIX = "/colder-mailer/prod"
@@ -40,8 +41,13 @@ def main() -> None:
         if args.dry_run:
             continue
         request = {"Name": f"{PREFIX}/{name}", "Value": value, "Type": "SecureString", "Overwrite": True}
-        subprocess.run(["aws", "ssm", "put-parameter", "--cli-input-json", "file:///dev/stdin"],
-                       input=json.dumps(request), text=True, check=True, stdout=subprocess.DEVNULL)
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".json") as payload:
+            json.dump(request, payload)
+            payload.flush()
+            subprocess.run(
+                ["aws", "ssm", "put-parameter", "--cli-input-json", f"file://{payload.name}"],
+                check=True, stdout=subprocess.DEVNULL,
+            )
     print(f"{'Would write' if args.dry_run else 'Wrote'} {len(values)} settings under {PREFIX}/")
 
 

@@ -21,11 +21,6 @@ Globals:
       Variables:
         ENV: prod
         SSM_PREFIX: !Ref SsmPrefix
-    Policies:
-      - Statement:
-          - Effect: Allow
-            Action: ssm:GetParametersByPath
-            Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SsmPrefix}"
 
 Resources:
   ApiFunction:
@@ -34,6 +29,11 @@ Resources:
       Description: Colder Mailer API
       Handler: app.aws.api.handler
       Timeout: 30
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: ssm:GetParametersByPath
+              Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SsmPrefix}/*"
       FunctionUrlConfig:
         AuthType: NONE # the app itself checks the Supabase login on every request
 
@@ -43,6 +43,11 @@ Resources:
       Description: Sends at most one queued email per run
       Handler: app.aws.sender.handler
       Timeout: 90
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: ssm:GetParametersByPath
+              Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SsmPrefix}/*"
       # Nothing is ever retried automatically (PLAN.md): no Lambda retries...
       EventInvokeConfig:
         MaximumRetryAttempts: 0
