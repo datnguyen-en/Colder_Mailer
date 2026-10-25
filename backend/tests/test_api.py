@@ -84,6 +84,42 @@ def test_preview_lists_template_problems(client):
     assert "[Company] has no value for this contact" in preview["problems"]
 
 
+def test_edit_personal_contact_company_fixes_preview(client, db):
+    client.post("/templates", json=TEMPLATE)
+    c = add_contact(client, "datn@umass.edu")
+    client.patch(f"/contacts/{c['id']}", json={"status": "failed"})
+    response = client.patch(f"/contacts/{c['id']}", json={"company_name": " UMass "})
+    assert response.status_code == 200
+    updated = response.json()
+    assert updated["company_name"] == "UMass"
+    assert updated["status"] == "failed"  # editing never queues or sends
+    assert db.get(Company, updated["company_id"]).domain is None
+    preview = client.get(f"/contacts/{c['id']}/preview").json()
+    assert preview["subject"] == "Software internship at UMass"
+    assert "[Company] has no value for this contact" not in preview["problems"]
+
+
+def test_edit_company_name_reuses_company_and_can_clear_it(client, db):
+    existing = add_contact(client, "jane@stripe.com")
+    c = add_contact(client, "datn@umass.edu")
+    response = client.patch(f"/contacts/{c['id']}", json={"company_name": " stripe "})
+    assert response.status_code == 200
+    assert response.json()["company_id"] == existing["company_id"]
+    assert len(db.scalars(select(Company)).all()) == 1
+    updated = client.patch(f"/contacts/{c['id']}", json={"company_name": " "}).json()
+    assert updated["company_id"] is None
+    assert updated["company_name"] is None
+    assert db.get(Company, existing["company_id"]).name == "Stripe"
+
+
+def test_company_edit_rejects_ambiguous_fields(client):
+    c = add_contact(client, "datn@umass.edu")
+    response = client.patch(f"/contacts/{c['id']}", json={
+        "company_name": "UMass", "company_id": None,
+    })
+    assert response.status_code == 422
+
+
 def test_csv_parse_and_import_keeps_title(client):
     csv_text = "First Name,Last Name,Title,Company,Email\nJane,Doe,Recruiter,Stripe,jane@stripe.com\n"
     rows = parse(client, csv_text, format="csv")

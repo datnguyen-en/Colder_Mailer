@@ -102,6 +102,7 @@ class ContactUpdate(BaseModel):
     last_name: str | None = Field(default=None, max_length=100)
     title: str | None = Field(default=None, max_length=200)
     company_id: int | None = None
+    company_name: str | None = Field(default=None, max_length=200)
     template_id: int | None = None  # null = use the company's template (or the default)
     # Manual status changes; "new" and "sending" are owned by the app.
     status: Literal["queued", "sent", "replied", "bounced", "failed"] | None = None

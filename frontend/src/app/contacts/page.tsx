@@ -82,7 +82,7 @@ function Contacts() {
   if (companyId) query.set("company_id", companyId)
   if (q) query.set("q", q)
   const { data, error, reload, setData } = useApi<ContactPage>(`/contacts?${query}`)
-  const { data: companies } = useApi<Company[]>("/companies")
+  const { data: companies, reload: reloadCompanies } = useApi<Company[]>("/companies")
   const companyName = companies?.find((c) => String(c.id) === companyId)?.name
 
   function setParam(changes: Record<string, string | null>) {
@@ -320,7 +320,10 @@ function Contacts() {
         contact={open}
         companies={companies ?? []}
         onClose={() => setOpen(null)}
-        onSaved={replaceContact}
+        onSaved={(updated) => {
+          replaceContact(updated)
+          reloadCompanies()
+        }}
         onSendNow={setConfirmSend}
       />
       <ConfirmDialog

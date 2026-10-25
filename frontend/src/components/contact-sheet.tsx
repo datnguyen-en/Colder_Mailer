@@ -11,13 +11,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -28,8 +21,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { patch, type Company, type Contact, type EmailPreview, type Template } from "@/lib/api"
 import { formatDateTime } from "@/lib/format"
 import { useApi } from "@/lib/use-api"
-
-const NO_COMPANY = "none"
 
 /** Drawer: edit a contact and see the exact email it would get. */
 export function ContactSheet({
@@ -72,7 +63,7 @@ function ContactDetails({
     first_name: contact.first_name ?? "",
     last_name: contact.last_name ?? "",
     title: contact.title ?? "",
-    company_id: contact.company_id ? String(contact.company_id) : NO_COMPANY,
+    company_name: contact.company_name ?? "",
   })
   const [saving, setSaving] = useState(false)
   const preview = useApi<EmailPreview>(`/contacts/${contact.id}/preview`)
@@ -100,7 +91,7 @@ function ContactDetails({
         first_name: form.first_name,
         last_name: form.last_name,
         title: form.title,
-        company_id: form.company_id === NO_COMPANY ? null : Number(form.company_id),
+        company_name: form.company_name.trim() || null,
       })
       onSaved(updated)
       reload()
@@ -111,11 +102,6 @@ function ContactDetails({
       setSaving(false)
     }
   }
-
-  const companyItems = [
-    { value: NO_COMPANY, label: "No company" },
-    ...companies.map((c) => ({ value: String(c.id), label: c.name })),
-  ]
 
   return (
     <>
@@ -145,19 +131,19 @@ function ContactDetails({
               onChange={(e) => setForm({ ...form, title: e.target.value })} />
           </div>
           <div className="space-y-1">
-            <Label>Company</Label>
-            <Select
-              items={companyItems}
-              value={form.company_id}
-              onValueChange={(v) => setForm({ ...form, company_id: v ?? NO_COMPANY })}
-            >
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {companyItems.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="contact-company">Company</Label>
+            <Input
+              id="contact-company"
+              list="contact-company-options"
+              value={form.company_name}
+              maxLength={200}
+              placeholder="e.g. UMass or Test Company"
+              onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+            />
+            <datalist id="contact-company-options">
+              {companies.map((company) => <option key={company.id} value={company.name} />)}
+            </datalist>
+            <p className="text-xs text-muted-foreground">Choose an existing company or type a new name.</p>
           </div>
           <div className="col-span-2">
             <Button type="submit" size="sm" disabled={saving}>

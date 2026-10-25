@@ -73,6 +73,21 @@ def update_contact(contact_id: int, req: schemas.ContactUpdate, db: Session = De
     changes = req.model_dump(exclude_unset=True)
     status = changes.pop("status", None)
 
+    if "company_name" in changes:
+        if "company_id" in changes:
+            raise HTTPException(422, "Use company_name or company_id, not both")
+        name = (changes.pop("company_name") or "").strip()
+        company = None
+        if name:
+            company = db.scalar(
+                select(Company).where(func.lower(Company.name) == name.lower())
+                .order_by(Company.id).limit(1)
+            )
+            if company is None:
+                company = Company(name=name)
+                db.add(company)
+        contact.company = company
+
     if "company_id" in changes and changes["company_id"] is not None:
         if db.get(Company, changes["company_id"]) is None:
             raise HTTPException(422, "Company not found")
